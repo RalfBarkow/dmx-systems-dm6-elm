@@ -1,4 +1,4 @@
-module Diagram.LoF exposing
+module Feature.Diagram.LoF exposing
     ( LoF(..)
     , callingExample
     , crossingExample
@@ -10,6 +10,7 @@ module Diagram.LoF exposing
     )
 
 import Html exposing (Html)
+import Html.Attributes as HA
 import Svg exposing (..)
 import Svg.Attributes as SA
 
@@ -80,11 +81,11 @@ rewriteListOnce xs =
 
         y :: ys ->
             let
-                y =
+                y1 =
                     rewriteOnce y
             in
-            if y /= y then
-                y :: ys
+            if y1 /= y then
+                y1 :: ys
 
             else
                 y :: rewriteListOnce ys
@@ -224,23 +225,20 @@ renderAt x y term =
                 gap =
                     16
 
-                step acc sub =
+                step sub ( accNodes, cursorX ) =
                     let
-                        ( w, h ) =
+                        ( w, _ ) =
                             measure sub
-
-                        ( nodes, cursorX ) =
-                            acc
 
                         nodesHere =
                             renderAt cursorX y sub
                     in
-                    ( nodes ++ nodesHere, cursorX + w + gap )
+                    ( accNodes ++ nodesHere, cursorX + w + gap )
 
-                ( nodes, _ ) =
+                ( allNodes, _ ) =
                     List.foldl step ( [], x ) xs
             in
-            nodes
+            allNodes
 
 
 viewStructure : LoF -> Html msg
@@ -252,16 +250,16 @@ viewStructure term =
         pad =
             8
 
-        W =
+        wTotal =
             w + 2 * pad
 
-        H =
+        hTotal =
             h + 2 * pad
     in
     svg
-        [ SA.viewBox ("0 0 " ++ String.fromFloat W ++ " " ++ String.fromFloat H)
-        , SA.width (String.fromFloat (W |> max 120))
-        , SA.height (String.fromFloat (H |> max 60))
+        [ SA.viewBox ("0 0 " ++ String.fromFloat wTotal ++ " " ++ String.fromFloat hTotal)
+        , SA.width (String.fromFloat (wTotal |> max 120))
+        , SA.height (String.fromFloat (hTotal |> max 60))
         , SA.style "border:1px solid var(--border,#444); border-radius:10px; padding:4px;"
         ]
         (renderAt pad pad term)
@@ -316,8 +314,8 @@ embed inner =
     foreignObject
         [ SA.x "0", SA.y "0", SA.width "300", SA.height "160" ]
         [ Html.div
-            [ Html.Attributes.style "width" "300px"
-            , Html.Attributes.style "height" "160px"
+            [ HA.style "width" "300px"
+            , HA.style "height" "160px"
             ]
             [ inner ]
         ]

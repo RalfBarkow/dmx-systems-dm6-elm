@@ -7,8 +7,9 @@ import Browser.Dom as Dom
 import Config exposing (..)
 import Defaults exposing (..)
 import Dict
+import Feature.Diagram.LoF exposing (LoF(..), reduce, viewCallingDemo, viewCrossingDemo, viewStructure)
 import Feature.OpenDoor.Move as OpenDoor
-import Html exposing (Attribute, br, div, text)
+import Html exposing (Attribute, Html, br, div, text)
 import Html.Attributes exposing (id, style)
 import IconMenuAPI exposing (updateIconMenu, viewIconMenu)
 import Json.Decode as D
@@ -94,6 +95,7 @@ view model =
             [ text model.measureText
             , br [] []
             ]
+        , div [] [ viewLoFDemo ]
         ]
 
 
@@ -565,3 +567,28 @@ delete model =
     in
     { newModel | selection = [] }
         |> autoSize
+
+
+viewLoFDemo : Html msg
+viewLoFDemo =
+    let
+        term =
+            Juxt [ Box Void, Box (Box Void) ]
+    in
+    Html.div
+        [ Html.Attributes.style "margin-top" "24px"
+        , Html.Attributes.style "padding" "12px"
+        , Html.Attributes.style "border" "1px solid #444"
+        , Html.Attributes.style "border-radius" "10px"
+        ]
+        [ Html.h3 [] [ Html.text "Laws of Form — Demo" ]
+        , viewCallingDemo
+        , Html.br [] []
+        , viewCrossingDemo
+        , Html.hr [] []
+        , Html.h4 [] [ Html.text "Arbitrary term" ]
+        , Html.text "Before:"
+        , viewStructure term
+        , Html.text "After (normal form):"
+        , viewStructure (reduce term)
+        ]
