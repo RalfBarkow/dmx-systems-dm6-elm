@@ -44,31 +44,49 @@ crossingExample =
 
 
 -- REWRITE ENGINE (single small-step)
+-- One-step, top-down rewrite
 
 
 rewriteOnce : LoF -> LoF
 rewriteOnce term =
     case term of
-        -- Crossing: ((x))  =>  x  when x == Void
-        -- In Bricken's "Crossing", the minimal iconic case is (()) => void
-        -- We encode that by matching Box (Box Void) => Void
+        -- CROSSING  (()) ⇒ ∅
         Box (Box Void) ->
             Void
 
-        -- Calling: ()() => ()
+        -- CALLING  ()() ⇒ ()
+        Juxt [ Box Void, Box Void ] ->
+            Box Void
+
+        -- Juxtaposition neutral/shape rules
+        Juxt [] ->
+            Void
+
+        Juxt [ x ] ->
+            x
+
+        Juxt (Void :: xs) ->
+            Juxt xs
+
+        Juxt (x :: Void :: xs) ->
+            Juxt (x :: xs)
+
+        -- Walk into children (stop after the first inner change)
+        Box inner ->
+            let
+                inner1 =
+                    rewriteOnce inner
+            in
+            if inner1 /= inner then
+                Box inner1
+
+            else
+                Box inner
+
         Juxt xs ->
-            case xs of
-                (Box Void) :: (Box Void) :: rest ->
-                    Juxt (Box Void :: rest)
+            Juxt (rewriteListOnce xs)
 
-                -- try inner rewrites left-to-right
-                _ ->
-                    Juxt (rewriteListOnce xs)
-
-        -- Try inside a Box/Juxt if the top-level rules don’t match
-        Box x ->
-            Box (rewriteOnce x)
-
+        -- Base
         Void ->
             Void
 
