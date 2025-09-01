@@ -16,7 +16,7 @@ import Svg.Attributes as SA
 
 
 {-| Iconic containment AST
-Void = unmarked state
+Void = unmarked state (empty enclosure)
 Box x = (x)
 Juxt [a,b..] = juxtaposition a b ...
 -}
@@ -38,7 +38,7 @@ callingExample =
 
 crossingExample : LoF
 crossingExample =
-    -- (())  ==>  (void)  ==>  void   (Crossing removes a double nest)
+    -- (())  ==>  ∅  (Crossing removes a double nest)
     Box (Box Void)
 
 
@@ -134,6 +134,10 @@ measure term =
         padding =
             12
 
+        voidD =
+            20
+
+        -- Void occupies a square; circle is centered inside
         baseW =
             60
 
@@ -145,7 +149,7 @@ measure term =
     in
     case term of
         Void ->
-            ( baseW |> toFloat, baseH |> toFloat )
+            ( toFloat voidD, toFloat voidD )
 
         Box inner ->
             let
@@ -176,12 +180,12 @@ measure term =
                                 |> Maybe.withDefault (toFloat baseH)
 
                         totalW =
-                            wSum + toFloat gap * toFloat (List.length xs - 1)
+                            wSum + 16 * toFloat (List.length xs - 1)
                     in
                     ( totalW, maxH )
 
 
-{-| Render a term at (x,y) as nested rectangles. Returns SVG nodes.
+{-| Render a term at (x,y). Returns SVG nodes.
 -}
 renderAt : Float -> Float -> LoF -> List (Svg msg)
 renderAt x y term =
@@ -208,35 +212,57 @@ renderAt x y term =
                 []
     in
     case term of
+        -- ○ Empty enclosure: unfilled circle, centered in its own (w,h) box
         Void ->
-            -- Show the void as a faint dashed outline to keep layout visible
-            [ Svg.rect
-                [ SA.x (String.fromFloat x)
-                , SA.y (String.fromFloat y)
-                , SA.width "60"
-                , SA.height "40"
+            let
+                ( w, h ) =
+                    measure Void
+
+                cx =
+                    x + w / 2
+
+                cy =
+                    y + h / 2
+
+                r =
+                    min w h / 2 - 1
+
+                -- inset to avoid clipping
+            in
+            [ Svg.circle
+                [ SA.cx (String.fromFloat cx)
+                , SA.cy (String.fromFloat cy)
+                , SA.r (String.fromFloat r)
                 , SA.fill "none"
                 , SA.stroke "currentColor"
-                , SA.strokeOpacity "0.3"
-                , SA.strokeDasharray "4,3"
-                , SA.rx "6"
-                , SA.ry "6"
+                , SA.strokeWidth strokeW
                 ]
                 []
             ]
 
+        -- Center inner within padded outer box
         Box inner ->
             let
-                ( w, h ) =
+                ( wOuter, hOuter ) =
                     measure term
 
-                outer =
-                    rect x y w h
+                ( wInner, hInner ) =
+                    measure inner
 
-                innerNodes =
-                    renderAt (x + padding) (y + padding) inner
+                contentW =
+                    wOuter - 2 * padding
+
+                contentH =
+                    hOuter - 2 * padding
+
+                innerX =
+                    x + padding + (contentW - wInner) / 2
+
+                innerY =
+                    y + padding + (contentH - hInner) / 2
             in
-            outer :: innerNodes
+            rect x y wOuter hOuter
+                :: renderAt innerX innerY inner
 
         Juxt xs ->
             let
