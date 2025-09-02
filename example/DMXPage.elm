@@ -19,13 +19,19 @@ type alias Model =
     }
 
 
-init : () -> ( Model, Cmd Msg )
+exampleConfig : DmxHttp.Config
+exampleConfig =
+    { base = "" -- IMPORTANT: same-origin calls through the proxy
+    , headers = []
+    }
+
+
 init _ =
     ( { topic = Nothing, error = Nothing }
     , Http.request
         { method = "GET"
-        , headers = DmxHttp.defaultConfig.headers
-        , url = DmxHttp.topicDeepUrl DmxHttp.defaultConfig 830082
+        , headers = exampleConfig.headers
+        , url = DmxHttp.topicDeepUrl exampleConfig 830082
         , body = Http.emptyBody
         , expect = Http.expectJson GotTopic Dmx.topicDecoder
         , timeout = Nothing

@@ -37,6 +37,9 @@
     "elm-live": "^4.0.2",
     "elm-review": "^2.13.4",
     "elm-test": "^0.19.1-revision16",
+    "express": "^5.1.0",
+    "http-proxy-middleware": "^3.0.5",
     "uglify-js": "^3.19.3"
-  }
+  },
+  "type": "module"
 }

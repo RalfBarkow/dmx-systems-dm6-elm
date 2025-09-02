@@ -1,59 +1,64 @@
-module Feature.DMX.Feature exposing
-    ( Model
-    , Msg(..)
-    , init
-    , subscriptions
-    , update
-    )
+module Feature.DMX.Feature exposing (Model, Msg(..), init, subscriptions, update)
 
-import Feature.DMX.Http as DmxHttp
-import Http
+import Feature.DMX.Decoders as Dmx
+import Feature.DMX.PortClient as DmxPort
 import Json.Decode as D
-
-
-
--- MODEL
+import Ports.Dmx as Port
 
 
 type alias Model =
-    { lastTopic : Maybe D.Value
-    , lastTopicmap : Maybe D.Value
+    { topic : Maybe Dmx.Topic
     , error : Maybe String
     }
 
 
+type Msg
+    = DmxOk Port.Response
+    | DmxErr Port.Error
+
+
 init : ( Model, Cmd Msg )
 init =
-    ( { lastTopic = Nothing
-      , lastTopicmap = Nothing
-      , error = Nothing
-      }
-    , DmxHttp.getTopic DmxHttp.defaultConfig 1 GotTopic
-    )
+    let
+        ( cmd, subs ) =
+            DmxPort.getTopicDeep
+                { topicId = 830082
+                , toMsg = DmxOk
+                , onErr = DmxErr
+                }
+    in
+    ( { topic = Nothing, error = Nothing }, cmd )
 
 
-
--- MSG
-
-
-type Msg
-    = GotTopic (Result Http.Error D.Value)
-    | GotTopicmap (Result Http.Error D.Value)
-    | GotSearch (Result Http.Error D.Value)
-
-
-
--- UPDATE
+subscriptions : Model -> Sub Msg
+subscriptions _ =
+    -- we get the Sub back the same way as in init:
+    DmxPort.getTopicDeep
+        { topicId = 0 -- unused here, we only want subs; ids are carried in the response
+        , toMsg = DmxOk
+        , onErr = DmxErr
+        }
+        |> Tuple.second
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        GotTopic (Ok json) ->
-            ( { model | lastTopic = Just json }, Cmd.none )
+        DmxOk resp ->
+            if resp.ok then
+                case D.decodeValue Dmx.topicDecoder resp.data of
+                    Ok t ->
+                        ( { model | topic = Just t }, Cmd.none )
 
-        GotTopic (Err e) ->
-            ( { model | error = Just (Debug.toString e) }, Cmd.none )
+                    Err e ->
+                        ( { model | error = Just ("decode: " ++ D.errorToString e) }
+                        , Cmd.none
+                        )
 
-        GotTopicmap (Ok json) ->
-            ( { model | lastTopicmap = Just json }, Cmd.none )
+            else
+                ( { model | error = Just ("HTTP " ++ String.fromInt resp.status) }
+                , Cmd.none
+                )
+
+        DmxErr e ->
+            ( { model | error = Just e.message }, Cmd.none )
