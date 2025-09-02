@@ -4,6 +4,8 @@ module Feature.DMX.Http exposing
     , getTopic
     , getTopicmap
     , searchTopicsFulltext
+    , topicDeepUrl
+    , topicUrl
     )
 
 import Http
@@ -13,7 +15,6 @@ import Json.Encode as E
 
 type alias Config =
     { base : String
-    , withCredentials : Bool
     , headers : List Http.Header
     }
 
@@ -21,9 +22,18 @@ type alias Config =
 defaultConfig : Config
 defaultConfig =
     { base = "https://dmx.ralfbarkow.ch"
-    , withCredentials = True -- include session cookie when CORS allows it
     , headers = [] -- add Authorization etc. here if you use Basic Auth
     }
+
+
+topicUrl : Config -> Int -> String
+topicUrl cfg topicId =
+    cfg.base ++ "/core/topic/" ++ String.fromInt topicId
+
+
+topicDeepUrl : Config -> Int -> String
+topicDeepUrl cfg topicId =
+    topicUrl cfg topicId ++ "?children=true&assocChildren=true"
 
 
 {-| GET /core/topic/{id} → raw JSON (tweak the decoder once you freeze the shape)
@@ -33,12 +43,11 @@ getTopic cfg topicId toMsg =
     Http.request
         { method = "GET"
         , headers = cfg.headers
-        , url = cfg.base ++ "/core/topic/" ++ String.fromInt topicId
+        , url = topicUrl cfg topicId
         , body = Http.emptyBody
         , expect = Http.expectJson toMsg D.value
-        , timeout = Nothing
+        , timeout = Nothing -- Maybe Float
         , tracker = Just ("dmx:getTopic:" ++ String.fromInt topicId)
-        , withCredentials = cfg.withCredentials
         }
 
 
@@ -54,7 +63,6 @@ getTopicmap cfg tmId toMsg =
         , expect = Http.expectJson toMsg D.value
         , timeout = Nothing
         , tracker = Just ("dmx:getTopicmap:" ++ String.fromInt tmId)
-        , withCredentials = cfg.withCredentials
         }
 
 
@@ -75,5 +83,4 @@ searchTopicsFulltext cfg { query } toMsg =
         , expect = Http.expectJson toMsg D.value
         , timeout = Nothing
         , tracker = Just "dmx:searchTopicsFulltext"
-        , withCredentials = cfg.withCredentials
         }
