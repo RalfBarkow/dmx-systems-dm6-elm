@@ -1,19 +1,14 @@
 module Utils exposing (..)
 
--- your pass-through, pipe-style logger (no-op in prod)
-
 import Html exposing (Attribute, Html, br, text)
 import Html.Events exposing (keyCode, on, stopPropagationOn)
 import Json.Decode as D
 import Log exposing (log)
-import Platform.Cmd as Cmd exposing (Cmd)
-import Ports.Console as Console
 
 
 
--- tiny console port used for real logs in prod
--- If you only used `toString` for logging, make it a no-op to avoid Debug.toString.
--- (Elm has no generic to-string without Debug.)
+-- Production-safe stringify stub (no Debug).
+-- If you want real strings in dev, you can conditionally swap this via your build.
 
 
 toString : a -> String
@@ -54,16 +49,6 @@ keyDecoder key msg_ =
     keyCode |> D.andThen isKey
 
 
-strToIntDecoder : String -> D.Decoder Int
-strToIntDecoder str =
-    case String.toInt str of
-        Just int ->
-            D.succeed int
-
-        Nothing ->
-            D.fail <| "\"" ++ str ++ "\" is an invalid ID"
-
-
 stopPropagationOnMousedown : msg -> Attribute msg
 stopPropagationOnMousedown msg_ =
     stopPropagationOn "mousedown" <| D.succeed ( msg_, True )
@@ -84,7 +69,7 @@ multilineHtml str =
 
 
 
--- Debug-ish helpers (pipe-style, remain pure: no console in prod)
+-- Debug
 
 
 logError : String -> String -> v -> v
@@ -105,36 +90,3 @@ call funcName args val =
 info : String -> v -> v
 info funcName val =
     log ("@" ++ funcName) val
-
-
-
--- Effectful companions for real console output (work under --optimize)
-
-
-infoCmd : String -> Cmd msg
-infoCmd =
-    Console.log
-
-
-withInfo : String -> ( model, Cmd msg ) -> ( model, Cmd msg )
-withInfo msg ( m, c ) =
-    ( m, Cmd.batch [ c, infoCmd msg ] )
-
-
-maybeInfo : Maybe String -> ( model, Cmd msg ) -> ( model, Cmd msg )
-maybeInfo m tuple =
-    case m of
-        Just s ->
-            withInfo s tuple
-
-        Nothing ->
-            tuple
-
-
-
--- Pipe a (model, Cmd msg) tuple through and add a console.log
-
-
-withConsole : String -> ( model, Cmd msg ) -> ( model, Cmd msg )
-withConsole line ( model, cmd ) =
-    ( model, Cmd.batch [ cmd, Console.log line ] )

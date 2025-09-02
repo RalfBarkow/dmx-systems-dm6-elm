@@ -82,7 +82,7 @@ itemDecoder msg =
     D.map Search <|
         D.map msg
             (D.at [ "target", "dataset", "id" ] D.string
-                |> D.andThen strToIntDecoder
+                |> D.andThen idDecoder
             )
 
 

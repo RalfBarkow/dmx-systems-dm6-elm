@@ -13,17 +13,17 @@ import ModelAPI exposing (..)
 
 autoSize : Model -> Model
 autoSize model =
-    calcMapRect (activeMap model) model |> Tuple.second
+    calcMapRect (activeMap model) -1 model |> Tuple.second
 
 
 
--- called indirect recursively
--- 1) calculate and store the map's "rect" and, based on its change,
--- 2) calculate and store the map's "pos" adjustmennt ("delta")
+-- parentMapId = -1
 
 
-calcMapRect : MapId -> Model -> ( Rectangle, Model )
-calcMapRect mapId model =
+{-| Calculates (recursively) the map's "rect"
+-}
+calcMapRect : MapId -> MapId -> Model -> ( Rectangle, Model )
+calcMapRect mapId parentMapId model =
     case getMap mapId model.maps of
         Just map ->
             let
@@ -46,33 +46,10 @@ calcMapRect mapId model =
                         (rect.x2 + whiteBoxPadding)
                         (rect.y2 + whiteBoxPadding)
             in
-            storeMapRect mapId newRect map.rect map.parentMapId model_
+            storeMapRect mapId newRect map.rect parentMapId model_
 
         Nothing ->
             ( Rectangle 0 0 0 0, model )
-
-
-storeMapRect : MapId -> Rectangle -> Rectangle -> MapId -> Model -> ( Rectangle, Model )
-storeMapRect mapId newRect oldRect parentMapId model =
-    if mapId == activeMap model then
-        ( newRect, model )
-
-    else
-        ( newRect
-        , { model
-            | maps =
-                model.maps
-                    |> updateMaps
-                        mapId
-                        (\map -> { map | rect = newRect })
-          }
-            |> setTopicPosByDelta mapId
-                parentMapId
-                (Point
-                    (newRect.x1 - oldRect.x1)
-                    (newRect.y1 - oldRect.y1)
-                )
-        )
 
 
 calcItemSize : MapItem -> MapId -> Rectangle -> Model -> ( Rectangle, Model )
@@ -92,7 +69,9 @@ calcItemSize mapItem mapId rectAcc model =
                 Container WhiteBox ->
                     let
                         ( rect, model_ ) =
-                            calcMapRect mapItem.id model
+                            calcMapRect mapItem.id mapId model
+
+                        -- recursion
                     in
                     ( mapExtent pos rect rectAcc, model_ )
 
@@ -101,6 +80,27 @@ calcItemSize mapItem mapId rectAcc model =
 
         MapAssoc _ ->
             ( rectAcc, model )
+
+
+{-| Store the map's "newRect" and, based on its change, calculate and stores the map's "pos"
+adjustmennt ("delta")
+-}
+storeMapRect : MapId -> Rectangle -> Rectangle -> MapId -> Model -> ( Rectangle, Model )
+storeMapRect mapId newRect oldRect parentMapId model =
+    if isFullscreen mapId model then
+        ( newRect, model )
+
+    else
+        ( newRect
+        , model
+            |> updateMapRect mapId (\rect -> newRect)
+            |> setTopicPosByDelta mapId
+                parentMapId
+                (Point
+                    (newRect.x1 - oldRect.x1)
+                    (newRect.y1 - oldRect.y1)
+                )
+        )
 
 
 topicExtent : Point -> Rectangle -> Rectangle

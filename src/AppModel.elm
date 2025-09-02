@@ -10,9 +10,9 @@ import Search exposing (SearchModel, SearchMsg)
 
 
 type alias Model =
-    { items : Items -- the knowledge base
-    , maps : Maps -- the views
-    , mapPath : List MapId
+    { items : Items -- TODO: represent container content independent from maps?
+    , maps : Maps
+    , mapPath : MapPath
     , nextId : Id
 
     ----- transient -----
@@ -34,9 +34,7 @@ default =
         Dict.singleton 0
         -- map 0 is the "home map", it has no corresponding topic
         <|
-            Map 0 -1 (Rectangle 0 0 0 0) Dict.empty
-
-    -- parentMapId = -1
+            Map 0 (Rectangle 0 0 0 0) Dict.empty
     , mapPath = [ 0 ]
     , nextId = 1
 
@@ -55,7 +53,6 @@ default =
 type Msg
     = AddTopic
     | MoveTopicToMap Id MapId Point Id MapId Point -- start point, random point (for target)
-    | MoveTopicToParentMap MapId Id -- (containerId, topicId)
     | SwitchDisplay DisplayMode
     | Edit EditMsg
     | Nav NavMsg

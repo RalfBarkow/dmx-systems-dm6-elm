@@ -10,9 +10,9 @@ module Compat.ModelAPI exposing
 
 import AppModel exposing (Model)
 import Config exposing (..)
-import Dict exposing (Dict)
+import Dict
 import Json.Encode as E
-import Main as AppMain
+import Main
 import Model exposing (..)
 import ModelAPI
 
@@ -22,7 +22,7 @@ import ModelAPI
 
 
 defaultModel =
-    Tuple.first (AppMain.init E.null)
+    Tuple.first (Main.init E.null)
 
 
 
@@ -68,8 +68,7 @@ isItemInMap id mapId model =
 
 {-| Ensure a map exists in `model.maps`.
 
-  - mapId 0: parentMapId = -1 (home)
-  - any other map: default parentMapId = 0
+root is id 0; other maps default to being children of 0 by containment
 
 -}
 ensureMap : MapId -> Model -> Model
@@ -78,19 +77,11 @@ ensureMap mapId m =
         m
 
     else
-        let
-            parent =
-                if mapId == 0 then
-                    -1
-
-                else
-                    0
-        in
         { m
             | maps =
                 Dict.insert
                     mapId
-                    (Model.Map mapId parent (Model.Rectangle 0 0 0 0) Dict.empty)
+                    (Model.Map mapId (Model.Rectangle 0 0 0 0) Dict.empty)
                     m.maps
         }
 
