@@ -17,7 +17,8 @@ main =
 view : Html msg
 view =
     div []
-        [ h2 [] [ text "LoF — Iconic Rendering (○ for Empty Container)" ]
+        [ div [] [ text "Iconic Rendering (○ for Empty Container)" ]
+        , br [] []
         , LoF.viewStructure (LoF.Box LoF.Void)
         , br [] []
         , LoF.viewCallingDemo
