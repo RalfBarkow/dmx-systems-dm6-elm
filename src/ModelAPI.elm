@@ -636,6 +636,11 @@ select itemId mapPath model =
     { model | selection = [ ( itemId, mapPath ) ] }
 
 
+resetSelection : Model -> Model
+resetSelection model =
+    { model | selection = [] }
+
+
 isSelected : Id -> MapId -> Model -> Bool
 isSelected itemId mapId model =
     model.selection

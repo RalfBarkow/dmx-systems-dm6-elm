@@ -4,15 +4,8 @@ import AppModel exposing (..)
 import Config exposing (..)
 import Dict
 import Model exposing (..)
-import ModelAPI
-    exposing
-        ( getMap
-        , getSingleSelection
-        , isVisible
-        , setTopicPosByDelta
-        , updateMapRect
-        )
-import Utils exposing (logError)
+import ModelAPI exposing (..)
+import Utils exposing (info, logError)
 
 
 
@@ -21,34 +14,98 @@ import Utils exposing (logError)
 
 autoSize : Model -> Model
 autoSize model =
+    let
+        paths =
+            findPaths model
+
+        _ =
+            info "autoSize" paths
+    in
+    paths |> List.foldl resizeMaps model
+
+
+
+-- left-fold resizes maps in selection path first
+
+
+{-| Finds the paths of the maps that might need resizing, based on current selection. Maps
+might occur in several paths, the "pos adjustment" though (see storeMapRect) must be applied
+only to the selection path (where interaction took place). This is done by returning the
+selection path first, the other map occurrences will calculate a zero adjustment then.
+-}
+findPaths : Model -> List MapPath
+findPaths model =
     case getSingleSelection model of
-        Just ( _, mapPath ) ->
-            autoSizeMap mapPath model
+        Just ( _, selPath ) ->
+            case selPath of
+                mapId :: _ :: _ ->
+                    let
+                        activeMapId =
+                            activeMap model
+                    in
+                    selPath
+                        :: -- put selection path at begin
+                           (findPaths_ activeMapId [ activeMapId ] mapId [] model
+                                |> List.filter ((/=) selPath)
+                           )
+
+                [ _ ] ->
+                    []
+
+                [] ->
+                    logError "findPaths" "selPath is empty!" []
 
         Nothing ->
-            model
+            []
 
 
-autoSizeMap : MapPath -> Model -> Model
-autoSizeMap mapPath model =
+{-| "itemId" is not necessarily a map Id
+-}
+findPaths_ : Id -> MapPath -> MapId -> List MapPath -> Model -> List MapPath
+findPaths_ itemId pathToItem searchMapId foundPaths model =
+    case itemId == searchMapId of
+        True ->
+            pathToItem :: foundPaths
+
+        False ->
+            case getMapIfExists itemId model.maps of
+                Just map ->
+                    map.items
+                        |> Dict.values
+                        |> List.filter isVisible
+                        |> List.foldr
+                            -- TODO: filter topics
+                            (\mapItem foundPathsAcc ->
+                                -- recursion
+                                findPaths_ mapItem.id (mapItem.id :: pathToItem) searchMapId foundPathsAcc model
+                            )
+                            foundPaths
+
+                Nothing ->
+                    foundPaths
+
+
+resizeMaps : MapPath -> Model -> Model
+resizeMaps mapPath model =
     case mapPath of
         [ mapId ] ->
             model
 
         mapId :: parentMapId :: mapIds ->
             model
-                |> calcMapRect mapId parentMapId
-                |> autoSizeMap (parentMapId :: mapIds)
+                |> resizeMap mapId parentMapId
+                |> resizeMaps (parentMapId :: mapIds)
 
         -- recursion
         [] ->
-            logError "autoSizeMap" "mapPath is empty!" model
+            logError "resizeMaps" "mapPath is empty!" model
 
 
-{-| Calculates the map's "rect"
+{-| Based on its content calculates the map's size (its "rect") and its position adjustment.
+Nested maps are expected to be sized already. Returns the updated model.
 -}
-calcMapRect : MapId -> MapId -> Model -> Model
-calcMapRect mapId parentMapId model =
+resizeMap : MapId -> MapId -> Model -> Model
+resizeMap mapId parentMapId model =
     case getMap mapId model.maps of
         Just map ->
             let
@@ -75,6 +132,10 @@ calcMapRect mapId parentMapId model =
 
         Nothing ->
             model
+
+
+
+-- error is already logged
 
 
 accumulateSize : MapItem -> MapId -> Rectangle -> Model -> Rectangle
