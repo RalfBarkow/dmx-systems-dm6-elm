@@ -1,30 +1,51 @@
-module AppEmbed exposing (main)
+port module AppEmbed exposing (Flags, Model, Msg, main)
 
-import AppMain as App
-import AppModel exposing (Msg, UndoModel)
 import Browser
-import Html exposing (Html)
-import Json.Encode as E
+import Html exposing (Html, div)
+import Main
 
 
 
--- Convert Document -> Html for embedding
+-- Optional outgoing ports (subscribe in JS only if present)
 
 
-viewEmbed : UndoModel -> Html Msg
-viewEmbed undoModel =
+port store : String -> Cmd msg
+
+
+port persist : String -> Cmd msg
+
+
+type alias Model =
+    Main.Model
+
+
+type alias Msg =
+    Main.Msg
+
+
+type alias Flags =
+    Main.Flags
+
+
+
+-- { slug : String, stored : String }
+
+
+viewElement : Model -> Html Msg
+viewElement model =
     let
         doc =
-            App.view undoModel
+            Main.view model
     in
-    Html.div [] doc.body
+    -- render only the body from Main.view inside our mount node
+    div [] doc.body
 
 
-main : Program E.Value UndoModel Msg
+main : Program Flags Model Msg
 main =
     Browser.element
-        { init = App.init
-        , update = App.update
-        , subscriptions = App.subscriptions
-        , view = viewEmbed
+        { init = Main.init
+        , update = Main.update
+        , subscriptions = Main.subscriptions
+        , view = viewElement
         }
