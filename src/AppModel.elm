@@ -1,7 +1,6 @@
 module AppModel exposing (..)
 
--- components
-
+import Compat.Display as Disp
 import Dict
 import IconMenu exposing (IconMenuModel, IconMenuMsg)
 import Model exposing (..)
@@ -29,6 +28,9 @@ type alias Model =
     , mouse : MouseModel
     , search : SearchModel
     , iconMenu : IconMenuModel
+
+    --
+    , display : Disp.DisplayConfig
     }
 
 
@@ -52,6 +54,9 @@ default =
     , mouse = Mouse.init
     , search = Search.init
     , iconMenu = IconMenu.init
+
+    --
+    , display = Disp.default
     }
 
 
