@@ -16,6 +16,20 @@ type alias Msg =
     Main.Msg
 
 
+
+-- Accept any JSON as flags
+
+
+main : Program D.Value Model Msg
+main =
+    Browser.document
+        { init = init
+        , update = update
+        , subscriptions = Main.subscriptions
+        , view = view
+        }
+
+
 init : D.Value -> ( Model, Cmd Msg )
 init flagsVal =
     let
@@ -35,7 +49,6 @@ init flagsVal =
             Main.init flags
 
         Err _ ->
-            -- Anything else (legacy full-model JSON, {}, null, numbers, etc.) → cold boot
             coldBoot
 
 
@@ -52,17 +65,3 @@ subscriptions =
 view : Model -> Document Msg
 view =
     Main.view
-
-
-
--- Accept Json.Value so {} and null are valid and legacy callers don't crash
-
-
-main : Program D.Value Model Msg
-main =
-    Browser.document
-        { init = init
-        , update = update
-        , subscriptions = subscriptions
-        , view = view
-        }
