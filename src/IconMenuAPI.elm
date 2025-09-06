@@ -76,21 +76,18 @@ viewIconMenu model =
 
 viewIconList : List (H.Html AM.Msg)
 viewIconList =
-    let
-        iconNames : List IconName
-        iconNames =
-            [ "circle", "square", "triangle", "star", "note" ]
-
-        viewOne iconName =
-            H.button
-                ([ HE.onClick (AM.IconMenu (IM.SetIcon (Just iconName)))
-                 , HA.title iconName
-                 ]
-                    ++ iconButtonStyle
-                )
-                [ viewIcon iconName 18 ]
-    in
-    List.map viewOne iconNames
+    Icon.icons
+        |> Dict.toList
+        |> List.map
+            (\( iconName, icon ) ->
+                H.button
+                    ([ HE.onClick (AM.IconMenu (IM.SetIcon (Just iconName)))
+                     , HA.title iconName
+                     ]
+                        ++ iconButtonStyle
+                    )
+                    [ Icon.toHtml [] icon ]
+            )
 
 
 
