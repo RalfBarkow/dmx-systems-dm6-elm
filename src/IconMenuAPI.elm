@@ -3,11 +3,14 @@ module IconMenuAPI exposing
     , openIconMenu
     , setIcon
     , updateIconMenu
+    , viewIcon
     , viewIconMenu
     , viewTopicIcon
     )
 
 import AppModel as AM
+import Dict
+import FeatherIcons as Icon
 import Html as H
 import Html.Attributes as HA
 import Html.Events as HE
@@ -15,6 +18,16 @@ import IconMenu as IM exposing (IconMenuMsg(..))
 import Json.Decode as D
 import Model as M exposing (IconName, Id)
 import String exposing (fromFloat)
+
+
+viewIcon : String -> Float -> H.Html msg
+viewIcon iconName sizePx =
+    case Dict.get iconName Icon.icons of
+        Just icon ->
+            icon |> Icon.withSize sizePx |> Icon.toHtml []
+
+        Nothing ->
+            H.text "??"
 
 
 
@@ -78,12 +91,6 @@ viewIconList =
                 [ viewIcon iconName 18 ]
     in
     List.map viewOne iconNames
-
-
-viewIcon : String -> Float -> H.Html AM.Msg
-viewIcon name sizePx =
-    -- placeholder rendering; replace with your real SVG/icon font
-    H.span [ HA.style "font-size" (fromFloat sizePx ++ "px") ] [ H.text name ]
 
 
 

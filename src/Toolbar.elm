@@ -122,7 +122,7 @@ viewToolbarButton label msg requireSelection model =
 
         buttonAttr =
             if requireSelection then
-                [ stopPropagationOnMousedown NoOp
+                [ stopPropagationOnMousedown AppModel.NoOp
                 , disabled hasNoSelection
                 ]
 
@@ -232,7 +232,7 @@ displayModeStyle disabled =
 viewRadioButton : String -> Msg -> Bool -> Bool -> Html Msg
 viewRadioButton label_ msg isChecked isDisabled =
     label
-        [ stopPropagationOnMousedown NoOp ]
+        [ stopPropagationOnMousedown AppModel.NoOp ]
         [ input
             [ type_ "radio"
             , name "display-mode"

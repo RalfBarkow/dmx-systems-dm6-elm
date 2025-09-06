@@ -1,67 +1,77 @@
-port module AppMain exposing (Model, Msg, init, main, subscriptions, update, view)
+module AppMain exposing (main)
 
+import AppModel as AM
 import Browser exposing (Document)
 import Json.Decode as D
+import Json.Encode as E
 import Main
+import Platform.Sub as Sub
 
 
-port persist : String -> Cmd msg
+
+-- Reuse AppModel's concrete types
 
 
 type alias Model =
-    Main.Model
+    AM.Model
 
 
 type alias Msg =
-    Main.Msg
-
-
-
--- Accept any JSON as flags
+    AM.Msg
 
 
 main : Program D.Value Model Msg
 main =
     Browser.document
         { init = init
-        , update = update
-        , subscriptions = Main.subscriptions
-        , view = view
+        , update = Main.update
+        , subscriptions = subscriptions
+        , view = Main.view
         }
+
+
+
+-- Accept any JSON and fall back to a tiny default flags object
 
 
 init : D.Value -> ( Model, Cmd Msg )
 init flagsVal =
-    let
-        flagsDecoder : D.Decoder Main.Flags
-        flagsDecoder =
-            D.map2 Main.Flags
-                (D.field "slug" D.string)
-                (D.field "stored" D.string)
-
-        coldBoot : ( Model, Cmd Msg )
-        coldBoot =
-            Main.init { slug = "dm6-elm-demo", stored = "{}" }
-    in
     case D.decodeValue flagsDecoder flagsVal of
-        Ok flags ->
-            -- New path with explicit {slug,stored}
-            Main.init flags
+        Ok _ ->
+            -- Pass the original JSON (it matched our expectations)
+            Main.init flagsVal
 
         Err _ ->
-            coldBoot
+            -- Fallback to {}-like flags encoded as JSON
+            Main.init (E.object [ ( "slug", E.string "empty" ), ( "stored", E.string "{}" ) ])
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    Main.update msg model
+
+-- Local flags decoder (since Main.flagsDecoder is not exported)
 
 
-subscriptions : Model -> Sub Msg
-subscriptions =
-    Main.subscriptions
+flagsDecoder : D.Decoder { slug : String, stored : String }
+flagsDecoder =
+    D.oneOf
+        [ D.map2 (\slug stored -> { slug = slug, stored = stored })
+            (D.field "slug" D.string)
+            (D.field "stored" D.string)
+        , D.map (\stored -> { slug = "local", stored = stored })
+            (D.field "stored" D.string)
+        , D.succeed defaultFlags
+        ]
 
 
-view : Model -> Document Msg
-view =
-    Main.view
+defaultFlags : { slug : String, stored : String }
+defaultFlags =
+    { slug = "local", stored = "{}" }
+
+
+
+-- Minimal stub so you can run the local-first build immediately.
+-- (If/when you re-export Main.subscriptions, replace this with Main.subscriptions.)
+
+
+subscriptions : Model -> Sub.Sub Msg
+subscriptions _ =
+    Sub.none
