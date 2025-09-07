@@ -11,7 +11,18 @@ import IconMenuAPI exposing (closeIconMenu)
 import Json.Decode as D
 import MapAutoSize exposing (autoSize)
 import Model exposing (Class, Id, MapPath, Point)
-import ModelAPI exposing (createDefaultAssocIn, fromPath, getMapId, getTopicPos, idDecoder, pathDecoder, select, setTopicPosByDelta)
+import ModelAPI
+    exposing
+        ( createDefaultAssocIn
+        , fromPath
+        , getMapId
+        , getTopicPos
+        , idDecoder
+        , pathDecoder
+        , resetSelection
+        , select
+        , setTopicPosByDelta
+        )
 import Mouse exposing (DragMode(..), DragState(..), MouseMsg(..))
 import Random
 import SearchAPI exposing (closeResultMenu)
@@ -64,7 +75,8 @@ updateMouse msg model =
 
 mouseDown : Model -> Model
 mouseDown model =
-    { model | selection = [] }
+    model
+        |> resetSelection
         |> closeIconMenu
         |> closeResultMenu
 

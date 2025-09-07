@@ -4,7 +4,6 @@ import AppModel exposing (..)
 import Boxing exposing (boxContainer, unboxContainer)
 import Browser
 import Browser.Dom as Dom
-import Compat.ModelAPI as ModelAPI exposing (addItemToMap)
 import Config exposing (..)
 import Dict
 import Html exposing (Attribute, br, div, text)
@@ -15,13 +14,13 @@ import Json.Encode as E
 import MapAutoSize exposing (autoSize)
 import MapRenderer exposing (viewMap)
 import Model exposing (..)
-import ModelAPI exposing (activeMap, createMap, createTopicIn, deleteItem, getMapId, getSingleSelection, getTopicProps, hasMap, hideItem, isItemInMap, select, setDisplayMode, setTopicPos, setTopicSize, updateMapRect, updateTopicInfo, updateTopicProps)
+import ModelAPI exposing (..)
 import MouseAPI exposing (mouseHoverHandler, mouseSubs, updateMouse)
 import SearchAPI exposing (updateSearch, viewResultMenu)
 import Storage exposing (modelDecoder, storeModel, storeModelWith)
 import String exposing (fromFloat, fromInt)
 import Task
-import UI.Toolbar exposing (viewToolbar)
+import Toolbar exposing (viewToolbar)
 import Utils exposing (..)
 
 
@@ -173,48 +172,37 @@ update msg model =
             ( model, Cmd.none )
 
 
-
--- Derive targetMapId from the path; upstream createMapIfNeeded takes 2 args
-
-
-moveTopicToMap : Id -> MapId -> Point -> Id -> List MapId -> Point -> Model -> Model
-moveTopicToMap topicId containerId origPos targetId targetMapPath newPos model0 =
+moveTopicToMap : Id -> MapId -> Point -> Id -> MapPath -> Point -> Model -> Model
+moveTopicToMap topicId mapId origPos targetId targetMapPath pos model =
     let
-        targetMapId =
-            targetMapPath |> List.reverse |> List.head |> Maybe.withDefault 0
+        ( newModel, created ) =
+            createMapIfNeeded targetId model
 
-        isSelfTarget =
-            targetId == topicId
+        newPos =
+            case created of
+                True ->
+                    Point
+                        (topicW2 + whiteBoxPadding)
+                        (topicH2 + whiteBoxPadding)
 
-        ( model1, created ) =
-            createMapIfNeeded targetId model0
-
-        actualPos =
-            if created then
-                Point (topicW2 + whiteBoxPadding) (topicH2 + whiteBoxPadding)
-
-            else
-                newPos
+                False ->
+                    pos
 
         props_ =
-            getTopicProps topicId containerId model1.maps
-                |> Maybe.map (\p -> MapTopic { p | pos = actualPos })
+            getTopicProps topicId mapId newModel.maps
+                |> Maybe.andThen (\props -> Just (MapTopic { props | pos = newPos }))
     in
-    if isSelfTarget then
-        model0
+    case props_ of
+        Just props ->
+            newModel
+                |> hideItem topicId mapId
+                |> setTopicPos topicId mapId origPos
+                |> addItemToMap topicId props targetId
+                |> select targetId targetMapPath
+                |> autoSize
 
-    else
-        case props_ of
-            Just props ->
-                model1
-                    |> hideItem topicId containerId
-                    |> setTopicPos topicId containerId origPos
-                    |> addItemToMap topicId props targetId
-                    |> select targetId targetMapPath
-                    |> autoSize
-
-            Nothing ->
-                model0
+        Nothing ->
+            model
 
 
 createMapIfNeeded : Id -> Model -> ( Model, Bool )
@@ -429,10 +417,8 @@ fullscreen : Model -> Model
 fullscreen model =
     case getSingleSelection model of
         Just ( topicId, _ ) ->
-            { model
-                | mapPath = topicId :: model.mapPath
-                , selection = []
-            }
+            { model | mapPath = topicId :: model.mapPath }
+                |> resetSelection
                 |> createMapIfNeeded topicId
                 |> Tuple.first
                 |> adjustMapRect topicId -1
@@ -488,7 +474,8 @@ hide model =
                     (\( itemId, mapPath ) modelAcc -> hideItem itemId (getMapId mapPath) modelAcc)
                     model
     in
-    { newModel | selection = [] }
+    newModel
+        |> resetSelection
         |> autoSize
 
 
@@ -502,5 +489,6 @@ delete model =
                     (\itemId modelAcc -> deleteItem itemId modelAcc)
                     model
     in
-    { newModel | selection = [] }
+    newModel
+        |> resetSelection
         |> autoSize
