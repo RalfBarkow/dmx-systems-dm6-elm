@@ -1,5 +1,7 @@
 module Toolbar exposing (viewToolbar)
 
+-- components
+
 import AppModel exposing (Model, Msg(..))
 import Config exposing (date, footerFontSize, homeMapName, mainFont, toolbarFontSize, version)
 import Html exposing (Attribute, Html, a, button, div, input, label, span, text)
@@ -48,6 +50,8 @@ viewToolbar model =
         , viewToolbarButton "Hide" Hide True model
         , viewToolbarButton "Fullscreen" (Nav Fullscreen) True model
         , viewToolbarButton "Delete" Delete True model
+        , viewToolbarButton "Import" Import False model
+        , viewToolbarButton "Export" Export False model
         , viewFooter
         ]
 
@@ -58,7 +62,7 @@ toolbarStyle =
     , style "display" "flex"
     , style "flex-direction" "column"
     , style "align-items" "flex-start"
-    , style "gap" "28px"
+    , style "gap" "24px"
     , style "position" "fixed"
     , style "z-index" "1"
     ]

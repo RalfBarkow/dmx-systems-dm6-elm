@@ -1,4 +1,6 @@
-module Main exposing (..)
+port module Main exposing (..)
+
+-- components
 
 import AppModel exposing (..)
 import Boxing exposing (boxContainer, unboxContainer)
@@ -22,6 +24,16 @@ import String exposing (fromFloat, fromInt)
 import Task
 import Toolbar exposing (viewToolbar)
 import Utils exposing (..)
+
+
+
+-- PORTS
+
+
+port importJSON : () -> Cmd msg
+
+
+port exportJSON : () -> Cmd msg
 
 
 
@@ -167,6 +179,12 @@ update msg model =
 
         Delete ->
             delete model |> storeModel
+
+        Import ->
+            ( model, importJSON () )
+
+        Export ->
+            ( model, exportJSON () )
 
         NoOp ->
             ( model, Cmd.none )

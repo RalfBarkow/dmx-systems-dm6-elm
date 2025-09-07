@@ -1,27 +1,52 @@
 <!DOCTYPE HTML>
 <html>
-
 <head>
   <meta charset="UTF-8">
   <script src="main.js">
   </script>
 </head>
-
 <body>
-  <script>
-    const storedData = localStorage.getItem('dm6-elm')
-    const model = storedData ? JSON.parse(storedData) : null
-
-    /* make app global so injected prod script can see it */
-    window.app = Elm.Main.init({ flags: model })
-
-    app.ports.store?.subscribe(function (model) {
-      localStorage.setItem('dm6-elm', JSON.stringify(model))
+<script>
+const key = 'dm6-elm'
+const modelStr = localStorage.getItem(key)
+const model = modelStr ? JSON.parse(modelStr) : null
+const app = Elm.Main.init({
+  flags: model
+})
+app.ports.store.subscribe(model => {
+  localStorage.setItem(key, JSON.stringify(model))
+})
+app.ports.importJSON.subscribe(() => {
+  const id = 'dm6-elm-importer'
+  const input = document.getElementById(id) || document.createElement('input')
+  if (!input.id) {
+    input.id = id
+    input.type = 'file'
+    input.style.display = 'none'
+    input.addEventListener('change', async () => {
+      localStorage.setItem(key, await input.files[0].text())
+      location.reload()
     })
-
-    /* no log port subscription here — dev remains clean */
-  </script>
-
+    document.body.appendChild(input)
+  }
+  input.click()
+})
+app.ports.exportJSON.subscribe(() => {
+  const id = 'dm6-elm-exporter'
+  const modelStr = localStorage.getItem(key)
+  const anchor = document.getElementById(id) || document.createElement('a')
+  const file = new File([modelStr], 'not-used')
+  const url = URL.createObjectURL(file)
+  if (!anchor.id) {
+    anchor.id = id
+    anchor.download = 'dm6-elm-export.json'
+    anchor.style.display = 'none'
+    document.body.appendChild(anchor)
+  }
+  anchor.setAttribute('href', url)
+  anchor.click()
+  URL.revokeObjectURL(url)
+})
+</script>
 </body>
-
 </html>
