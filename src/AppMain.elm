@@ -56,7 +56,7 @@ flagsDecoder =
         [ D.map2 (\slug stored -> { slug = slug, stored = stored })
             (D.field "slug" D.string)
             (D.field "stored" D.string)
-        , D.map (\stored -> { slug = "local", stored = stored })
+        , D.map (\stored -> { slug = "empty", stored = stored })
             (D.field "stored" D.string)
         , D.succeed defaultFlags
         ]
@@ -64,7 +64,7 @@ flagsDecoder =
 
 defaultFlags : { slug : String, stored : String }
 defaultFlags =
-    { slug = "local", stored = "{}" }
+    { slug = "empty", stored = "{}" }
 
 
 

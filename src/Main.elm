@@ -12,6 +12,7 @@ import Html.Attributes exposing (id, style)
 import IconMenuAPI exposing (updateIconMenu, viewIconMenu)
 import Json.Decode as D
 import Json.Encode as E
+import Log exposing (info)
 import MapAutoSize exposing (autoSize)
 import MapRenderer exposing (viewMap)
 import Model exposing (..)
@@ -39,13 +40,64 @@ main =
         }
 
 
+trace : String -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+trace tag (( m, cmd ) as result) =
+    let
+        _ =
+            Log.info ("update." ++ tag) ""
+    in
+    result
+
+
+traceWith : String -> String -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+traceWith tag payload (( m, cmd ) as result) =
+    let
+        _ =
+            Log.info
+                ("update."
+                    ++ tag
+                    ++ (if payload == "" then
+                            ""
+
+                        else
+                            " | " ++ payload
+                       )
+                )
+                ""
+    in
+    result
+
+
+describeDisplayMode : DisplayMode -> String
+describeDisplayMode dm =
+    case dm of
+        Monad LabelOnly ->
+            "Monad(LabelOnly)"
+
+        Monad Detail ->
+            "Monad(Detail)"
+
+        Container BlackBox ->
+            "Container(BlackBox)"
+
+        Container WhiteBox ->
+            "Container(WhiteBox)"
+
+        Container Unboxed ->
+            "Container(Unboxed)"
+
+
+
+-- INIT
+
+
 init : E.Value -> ( Model, Cmd Msg )
 init flags =
     ( case flags |> D.decodeValue (D.null True) of
         Ok True ->
             let
                 _ =
-                    info "init" "localStorage: empty"
+                    Log.info "init" "localStorage: empty"
             in
             default
 
@@ -54,7 +106,7 @@ init flags =
                 Ok model ->
                     let
                         _ =
-                            info "init"
+                            Log.info "init"
                                 ("localStorage: " ++ (model |> toString |> String.length |> fromInt) ++ " bytes")
                     in
                     model
@@ -136,42 +188,63 @@ update msg model =
                     msg
 
                 _ ->
-                    info "update" msg
+                    Log.info "update" msg
     in
     case msg of
         FedWikiPage raw ->
-            -- store the incoming FedWiki page JSON string
             ( { model | fedWikiRaw = raw }, Cmd.none )
+                |> traceWith "fedwiki" ("len=" ++ String.fromInt (String.length raw))
 
         AddTopic ->
-            createTopicIn topicDefaultText Nothing [ activeMap model ] model |> storeModel
+            createTopicIn topicDefaultText Nothing [ activeMap model ] model
+                |> storeModel
+                |> trace "addTopic"
 
         MoveTopicToMap topicId mapId origPos targetId targetMapPath pos ->
-            moveTopicToMap topicId mapId origPos targetId targetMapPath pos model |> storeModel
+            moveTopicToMap topicId mapId origPos targetId targetMapPath pos model
+                |> storeModel
+                |> traceWith "moveTopic"
+                    ("topic="
+                        ++ String.fromInt topicId
+                        ++ " -> "
+                        ++ String.fromInt targetId
+                    )
 
         SwitchDisplay displayMode ->
-            switchDisplay displayMode model |> storeModel
+            switchDisplay displayMode model
+                |> storeModel
+                |> traceWith "switchDisplay" (describeDisplayMode displayMode)
 
         Search searchMsg ->
             updateSearch searchMsg model
+                |> trace "search"
 
         Edit editMsg ->
             updateEdit editMsg model
+                |> trace "edit"
 
         IconMenu iconMenuMsg ->
             updateIconMenu iconMenuMsg model
+                |> trace "iconMenu"
 
         Mouse mouseMsg ->
             updateMouse mouseMsg model
+                |> trace "mouse"
 
         Nav navMsg ->
-            updateNav navMsg model |> storeModel
+            updateNav navMsg model
+                |> storeModel
+                |> trace "nav"
 
         Hide ->
-            hide model |> storeModel
+            hide model
+                |> storeModel
+                |> trace "hide"
 
         Delete ->
-            delete model |> storeModel
+            delete model
+                |> storeModel
+                |> trace "delete"
 
         NoOp ->
             ( model, Cmd.none )
