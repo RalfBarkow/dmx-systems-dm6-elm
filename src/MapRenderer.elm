@@ -5,9 +5,10 @@ import Compat.ModelAPI exposing (getMapItemById)
 import Config exposing (..)
 import Dict
 import Html exposing (Attribute, Html, div, input, text, textarea)
-import Html.Attributes exposing (attribute, id, style, value)
-import Html.Events exposing (onBlur, onInput)
+import Html.Attributes exposing (attribute, class, id, style, value)
+import Html.Events exposing (on, onBlur, onInput)
 import IconMenuAPI exposing (viewTopicIcon)
+import Json.Decode as D
 import Model exposing (..)
 import ModelAPI
     exposing
@@ -24,11 +25,11 @@ import ModelAPI
         , isSelected
         , isVisible
         )
-import Mouse exposing (DragMode(..), DragState(..))
+import Mouse exposing (DragMode(..), DragState(..), MouseMsg(..))
 import Search exposing (ResultMenu(..))
 import String exposing (fromFloat, fromInt)
-import Svg exposing (Svg, circle, g, path, svg, text)
-import Svg.Attributes
+import Svg exposing (Svg, circle, g, path, rect, svg, text)
+import Svg.Attributes as SA
     exposing
         ( cx
         , cy
@@ -40,6 +41,7 @@ import Svg.Attributes
         , fontSize
         , fontWeight
         , height
+        , pointerEvents
         , r
         , stroke
         , strokeDasharray
@@ -54,10 +56,21 @@ import Svg.Attributes
         , y1
         , y2
         )
+import Svg.Events as SE
 import Utils exposing (..)
 
 
 
+-- Class tag used in Mouse messages for topics
+
+
+topicCls : Class
+topicCls =
+    "topic monad"
+
+
+
+-- if this errors because Class = List String, use: [ "topic", "monad" ]
 -- CONFIG
 
 
@@ -103,17 +116,8 @@ viewMap mapId mapPath model =
                 ++ limboTopic mapId model
             )
         , svg
-            ([ width svgSize.w, height svgSize.h ]
-                ++ topicAttr mapId mapPath model
-                ++ svgStyle
-            )
-            [ g
-                (gAttr mapId mapRect model)
-                (assocsSvg
-                    ++ topicsSvg
-                    ++ viewLimboAssoc mapId model
-                )
-            ]
+            ([ width svgSize.w, height svgSize.h ] ++ svgStyle)
+            [ g (gAttr mapId mapRect model) (assocsSvg ++ topicsSvg ++ viewLimboAssoc mapId model) ]
         ]
 
 
@@ -324,7 +328,17 @@ viewTopicSvg topic props mapPath model =
 
         mainNodes : List (Svg Msg)
         mainNodes =
-            [ circle
+            [ -- invisible square hitbox so label/circle are easy to grab
+              rect
+                [ x (fromFloat (props.pos.x - rVal))
+                , y (fromFloat (props.pos.y - rVal))
+                , width (fromFloat (rVal * 2))
+                , height (fromFloat (rVal * 2))
+                , fill "transparent"
+                , attribute "pointer-events" "all"
+                ]
+                []
+            , circle
                 [ cx cxStr
                 , cy cyStr
                 , r rStr
@@ -349,8 +363,10 @@ viewTopicSvg topic props mapPath model =
             ]
     in
     g
-        (topicAttr topic.id mapPath model)
-        (shadowNodes ++ mainNodes)
+        (svgTopicAttr topic.id mapPath
+            ++ [ SA.transform "translate(0,0)" ]
+        )
+        mainNodes
 
 
 isTargeted : Id -> MapId -> Model -> Bool
@@ -391,7 +407,7 @@ viewTopic topic props mapPath model =
             topicFunc topic props mapPath model
     in
     div
-        (topicAttr topic.id mapPath model
+        (topicAttr topic.id mapPath
             ++ topicStyle topic.id model
             ++ style
         )
@@ -657,17 +673,27 @@ mapItemCount topicId props model =
     ]
 
 
-topicAttr : Id -> MapPath -> Model -> List (Attribute Msg)
-topicAttr topicId mapPath model =
-    if isFullscreen topicId model then
-        []
-        -- TODO: the fullscreen map would require dedicated event handling, e.g. panning?
+topicAttr : Id -> MapPath -> List (Attribute Msg)
+topicAttr id mapPath =
+    [ class "topic monad"
+    , style "cursor" "move"
+    , on "mousedown" (D.map (Mouse << DownItem topicCls id mapPath) posDecoder)
+    , on "mouseenter" (D.succeed (Mouse (Over topicCls id mapPath)))
+    , on "mousemove" (D.succeed (Mouse (Over topicCls id mapPath)))
+    , on "mouseup" (D.succeed (Mouse Up))
+    ]
 
-    else
-        [ attribute "class" "dmx-topic"
-        , attribute "data-id" (fromInt topicId)
-        , attribute "data-path" (fromPath mapPath)
-        ]
+
+svgTopicAttr : Id -> MapPath -> List (Svg.Attribute Msg)
+svgTopicAttr id mapPath =
+    [ SA.class "topic monad"
+    , attribute "pointer-events" "bounding-box"
+    , SA.style "cursor: move"
+    , SE.on "mousedown" (D.map (Mouse << DownItem topicCls id mapPath) posDecoder)
+    , SE.on "mouseenter" (D.succeed (Mouse (Over topicCls id mapPath)))
+    , SE.on "mousemove" (D.succeed (Mouse (Over topicCls id mapPath)))
+    , SE.on "mouseup" (D.succeed (Mouse Up))
+    ]
 
 
 viewAssoc : AssocInfo -> MapId -> Model -> Svg Msg
@@ -1215,3 +1241,10 @@ monadMark title =
 
     else
         take (min 2 (String.length trimmed)) trimmed
+
+
+posDecoder : D.Decoder Point
+posDecoder =
+    D.map2 Point
+        (D.field "clientX" D.float)
+        (D.field "clientY" D.float)
