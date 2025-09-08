@@ -3,15 +3,25 @@
 <title>dm6 wiki console</title>
 <link href="https://cdn.jsdelivr.net/npm/@observablehq/inspector@5.0.1/dist/inspector.min.css" rel="stylesheet">
 <style>
-  body { margin:0; font:14px/1.35 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-  #toolbar { padding:8px 10px; border-bottom:1px solid #eee; display:flex; gap:8px; align-items:center; }
-  #app { height:45vh; border-bottom:1px solid #eee; }
-  #jqbar { display:flex; gap:8px; align-items:center; padding:10px; }
-  #jq { flex:1; border:1px solid #ccc; height:2.25rem; padding:.4rem .6rem; font: 13px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  #result { padding:10px; }
-  .spacer { flex:1; } .muted{ color:#666; font-size:12px; }
-  button { padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; background: #fafafa; cursor: pointer; }
-  button:hover { background: #f0f0f0; }
+  :root{ --pad:10px; --muted:#666; --line:#eee; --ring:#ccc; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  html,body{ height:100% }
+  body{ margin:0; font:14px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  details{ border-bottom:1px solid var(--line) }
+  summary{ list-style:none; cursor:pointer; padding:8px var(--pad); display:flex; gap:8px; align-items:center }
+  summary::-webkit-details-marker{ display:none }
+  .spacer{ flex:1 }
+  .muted{ color:var(--muted); font-size:12px }
+  .btn{ padding:4px 8px; border:1px solid var(--ring); border-radius:6px; background:#fafafa; cursor:pointer }
+  .btn:hover{ background:#f0f0f0 }
+  #elmMount{ min-height:140px; height:40vh; resize:vertical; overflow:auto; padding:0; }
+  #jqbar{ display:flex; gap:8px; align-items:center; padding:8px var(--pad) }
+  #jq{ flex:1; border:1px solid var(--ring); height:2.1rem; padding:.35rem .55rem; font:13px/1.35 var(--mono) }
+  #result{ max-height:28vh; overflow:auto; padding:0 var(--pad) var(--pad) var(--pad) }
+  #flags{ font-size:12px; color:var(--muted) }
+  @media (max-width:420px){
+    #elmMount{ height:34vh }
+    #result{ max-height:24vh }
+  }
 </style>
 
 <div id="toolbar">
@@ -23,13 +33,20 @@
 
 <div id="app"></div>
 
-<div id="jqbar">
-  <label for="jq" class="muted">jq filter</label>
-  <input id="jq" placeholder=".title | ., .story | length, .story[] | .type" />
-  <button id="run">Run</button>
-</div>
 
-<div id="result"></div>
+<!-- jq pane -->
+<details id="jqPane" open>
+  <summary>
+    <strong>jq</strong>
+    <span class="muted" id="jqMeta"></span>
+    <span class="spacer"></span>
+    <button id="run" class="btn">Run</button>
+  </summary>
+  <div id="jqbar">
+    <input id="jq" list="jq-presets" placeholder=".title · .story|length · .story[]|.type" />
+  </div>
+  <div id="result"></div>
+</details>
 
 <!-- IMPORTANT: this elm.js must be built from AppEmbed.elm (Browser.element) -->
 <script src="elm.js"></script>
@@ -41,12 +58,15 @@
   import * as frames from 'https://wiki.dbbs.co/assets/v1/frame.js'
   import {Inspector} from 'https://cdn.jsdelivr.net/npm/@observablehq/inspector@5.0.1/+esm'
 
+  // ---------- Elements ----------
   const $mount  = document.getElementById('app')
   const $status = document.getElementById('status')
   const $jq     = document.getElementById('jq')
   const $run    = document.getElementById('run')
+  const $jqMeta  = document.getElementById('jqMeta')
   const inspector = new Inspector(document.getElementById('result'))
 
+  // ---------- Helpers ----------
   const asSlug = t => String(t||'').replace(/\s/g,'-').replace(/[^A-Za-z0-9-]/g,'').toLowerCase()
 
   function pickElmModule() {
@@ -55,6 +75,7 @@
     return window.Elm.AppEmbed || window.Elm.AppMain || window.Elm.Main || null
   }
 
+  // ---------- Elm boot ----------
   function bootElm(flags){
     const App = pickElmModule()
     if (!App) {
@@ -85,16 +106,23 @@
     return app
   }
 
-  // jq wiring — run filter against FedWiki page JSON (window.data)
+  // ---------- jq wiring ----------
+  let lastRanAt = 0
   async function runJq(filter) {
+    const started = performance.now()
     inspector.pending()
-    try {
-      if (!window.jq || typeof window.jq.json !== 'function')
+    try{
+      if(!window.jq || typeof window.jq.json !== 'function')
         throw new Error('jq runtime not loaded (jq.json unavailable)')
       const data = window.data ?? {}
-      const result = await window.jq.json(data, String(filter || '').trim() || '.')
+      const result = await window.jq.json(data, String(filter||'').trim() || '.')
       inspector.fulfilled(result)
-    } catch (err) {
+      const ms = Math.max(1, Math.round(performance.now() - started))
+      const bytes = typeof result === 'string' ? result.length : JSON.stringify(result).length
+      lastRanAt = Date.now()
+      $jqMeta.textContent = `ok • ${bytes}B • ${ms}ms`
+    }catch(err){
+      $jqMeta.textContent = 'error'
       inspector.rejected(err)
     }
   }
