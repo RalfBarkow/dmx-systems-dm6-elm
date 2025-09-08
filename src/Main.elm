@@ -7,7 +7,8 @@ import Browser.Dom as Dom
 import Compat.ModelAPI as ModelAPI exposing (addItemToMap)
 import Config exposing (..)
 import Dict
-import Html exposing (Attribute, br, div, text)
+import FedWiki
+import Html exposing (Attribute, Html, br, div, text)
 import Html.Attributes exposing (id, style)
 import IconMenuAPI exposing (updateIconMenu, viewIconMenu)
 import Json.Decode as D
@@ -192,7 +193,11 @@ update msg model =
     in
     case msg of
         FedWikiPage raw ->
-            ( { model | fedWikiRaw = raw }, Cmd.none )
+            ( model
+                |> FedWiki.renderAsMonad raw
+                |> (\m -> { m | fedWikiRaw = raw })
+            , Cmd.none
+            )
                 |> traceWith "fedwiki" ("len=" ++ String.fromInt (String.length raw))
 
         AddTopic ->
@@ -581,3 +586,14 @@ delete model =
     in
     { newModel | selection = [] }
         |> autoSize
+
+
+
+-- Map-only element view for embedding
+
+
+viewElementMap : Model -> Html Msg
+viewElementMap model =
+    div
+        (mouseHoverHandler ++ appStyle)
+        [ viewMap (activeMap model) [] model ]
