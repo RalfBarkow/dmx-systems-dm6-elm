@@ -1,4 +1,4 @@
-module DevLogger exposing (..)
+module Logger exposing (..)
 
 import Debug
 

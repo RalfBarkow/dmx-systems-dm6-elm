@@ -1,17 +1,13 @@
 module Logger exposing (..)
 
-import Debug
-
-
-
---- DEV LOGGER
+--- PROD LOGGER
 
 
 log : String -> a -> a
-log =
-    Debug.log
+log _ val =
+    val
 
 
 toString : a -> String
-toString =
-    Debug.toString
+toString _ =
+    ""
