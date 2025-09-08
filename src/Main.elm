@@ -23,7 +23,7 @@ import Storage exposing (modelDecoder, storeModel, storeModelWith)
 import String exposing (fromFloat, fromInt)
 import Task
 import Toolbar exposing (viewToolbar)
-import UndoList exposing (UndoList)
+import UndoList
 import Utils exposing (..)
 
 
@@ -91,14 +91,14 @@ initModel flags =
 
 
 view : UndoModel -> Browser.Document Msg
-view { present } =
+view ({ present } as undoModel) =
     Browser.Document
         "DM6 Elm"
         [ div
             (mouseHoverHandler
                 ++ appStyle
             )
-            ([ viewToolbar present
+            ([ viewToolbar undoModel
              , viewMap (activeMap present) [] present -- mapPath = []
              ]
                 ++ viewResultMenu present
@@ -172,7 +172,7 @@ update msg ({ present } as undoModel) =
                 |> swap undoModel
 
         Search searchMsg ->
-            updateSearch searchMsg present |> swap undoModel
+            updateSearch searchMsg undoModel
 
         Edit editMsg ->
             updateEdit editMsg present |> swap undoModel
@@ -528,17 +528,3 @@ delete model =
     newModel
         |> resetSelection
         |> autoSize
-
-
-
--- Undo / Redo
-
-
-push : UndoModel -> ( Model, Cmd Msg ) -> ( UndoModel, Cmd Msg )
-push undoModel ( model, cmd ) =
-    ( UndoList.new model undoModel, cmd )
-
-
-swap : UndoModel -> ( Model, Cmd Msg ) -> ( UndoModel, Cmd Msg )
-swap undoModel ( model, cmd ) =
-    ( UndoList.mapPresent (\_ -> model) undoModel, cmd )

@@ -6,6 +6,7 @@ import Dict
 import Json.Decode as D
 import Model exposing (..)
 import String exposing (fromInt)
+import UndoList
 import Utils exposing (..)
 
 
@@ -663,6 +664,20 @@ getSingleSelection model =
 
         _ ->
             Nothing
+
+
+
+-- Undo / Redo
+
+
+push : UndoModel -> ( Model, Cmd Msg ) -> ( UndoModel, Cmd Msg )
+push undoModel ( model, cmd ) =
+    ( UndoList.new model undoModel, cmd )
+
+
+swap : UndoModel -> ( Model, Cmd Msg ) -> ( UndoModel, Cmd Msg )
+swap undoModel ( model, cmd ) =
+    ( UndoList.mapPresent (\_ -> model) undoModel, cmd )
 
 
 

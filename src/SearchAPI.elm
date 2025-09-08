@@ -1,7 +1,8 @@
 module SearchAPI exposing (closeResultMenu, updateSearch, viewResultMenu, viewSearchInput)
 
-import AppModel exposing (Model, Msg(..))
-import Compat.ModelAPI as ModelAPI exposing (addItemToMap)
+-- components
+
+import AppModel exposing (Model, Msg(..), UndoModel)
 import Config exposing (contentFontSize, topicSize)
 import Dict
 import Html exposing (Attribute, Html, div, input, text)
@@ -9,15 +10,7 @@ import Html.Attributes exposing (attribute, style, value)
 import Html.Events exposing (on, onFocus, onInput)
 import Json.Decode as D
 import Model exposing (Id, ItemInfo(..), MapId, MapProps(..))
-import ModelAPI
-    exposing
-        ( activeMap
-        , defaultProps
-        , getTopicInfo
-        , idDecoder
-        , isItemInMap
-        , showItem
-        )
+import ModelAPI exposing (..)
 import Search exposing (ResultMenu(..), SearchMsg(..))
 import Storage exposing (storeModel)
 import String exposing (fromInt)
@@ -143,26 +136,27 @@ resultItemStyle topicId model =
 -- UPDATE
 
 
-updateSearch : SearchMsg -> Model -> ( Model, Cmd Msg )
-updateSearch msg model =
+updateSearch : SearchMsg -> UndoModel -> ( UndoModel, Cmd Msg )
+updateSearch msg ({ present } as undoModel) =
     case msg of
         Input text ->
-            ( onTextInput text model, Cmd.none )
+            ( onTextInput text present, Cmd.none ) |> swap undoModel
 
         FocusInput ->
-            ( onFocusInput model, Cmd.none )
+            ( onFocusInput present, Cmd.none ) |> swap undoModel
 
         HoverItem topicId ->
-            ( onHoverItem topicId model, Cmd.none )
+            ( onHoverItem topicId present, Cmd.none ) |> swap undoModel
 
         UnhoverItem _ ->
-            ( onUnhoverItem model, Cmd.none )
+            ( onUnhoverItem present, Cmd.none ) |> swap undoModel
 
         ClickItem topicId ->
-            model
-                |> revealTopic topicId (activeMap model)
+            present
+                |> revealTopic topicId (activeMap present)
                 |> closeResultMenu
                 |> storeModel
+                |> push undoModel
 
 
 onTextInput : String -> Model -> Model

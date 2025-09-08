@@ -2,7 +2,7 @@ module Toolbar exposing (viewToolbar)
 
 -- components
 
-import AppModel exposing (Model, Msg(..))
+import AppModel exposing (Model, Msg(..), UndoModel)
 import Config exposing (date, footerFontSize, homeMapName, mainFont, toolbarFontSize, version)
 import Html exposing (Attribute, Html, a, button, div, input, label, span, text)
 import Html.Attributes exposing (checked, disabled, href, name, style, type_)
@@ -29,6 +29,7 @@ import ModelAPI
         )
 import SearchAPI exposing (viewSearchInput)
 import String exposing (fromInt)
+import UndoList
 import Utils exposing (stopPropagationOnMousedown)
 
 
@@ -36,29 +37,29 @@ import Utils exposing (stopPropagationOnMousedown)
 -- VIEW
 
 
-viewToolbar : Model -> Html Msg
-viewToolbar model =
+viewToolbar : UndoModel -> Html Msg
+viewToolbar ({ present } as undoModel) =
     div
         toolbarStyle
-        [ viewMapNav model
-        , viewSearchInput model
-        , viewToolbarButton "Add Topic" AddTopic False model
-        , viewToolbarButton "Edit" (Edit EditStart) True model
-        , viewToolbarButton "Choose Icon" (IconMenu Open) True model
-        , viewMonadDisplay model
-        , viewContainerDisplay model
-        , viewToolbarButton "Hide" Hide True model
-        , viewToolbarButton "Fullscreen" (Nav Fullscreen) True model
-        , viewToolbarButton "Delete" Delete True model
+        [ viewMapNav present
+        , viewSearchInput present
+        , viewToolbarButton "Add Topic" AddTopic always undoModel
+        , viewToolbarButton "Edit" (Edit EditStart) hasSelection undoModel
+        , viewToolbarButton "Choose Icon" (IconMenu Open) hasSelection undoModel
+        , viewMonadDisplay present
+        , viewContainerDisplay present
+        , viewToolbarButton "Hide" Hide hasSelection undoModel
+        , viewToolbarButton "Fullscreen" (Nav Fullscreen) hasSelection undoModel
+        , viewToolbarButton "Delete" Delete hasSelection undoModel
         , div
             []
-            [ viewToolbarButton "Undo" Undo False model
-            , viewToolbarButton "Redo" Redo False model
+            [ viewToolbarButton "Undo" Undo hasPast undoModel
+            , viewToolbarButton "Redo" Redo hasFuture undoModel
             ]
         , div
             []
-            [ viewToolbarButton "Import" Import False model
-            , viewToolbarButton "Export" Export False model
+            [ viewToolbarButton "Import" Import always undoModel
+            , viewToolbarButton "Export" Export always undoModel
             ]
         , viewFooter
         ]
@@ -126,21 +127,13 @@ getMapName model =
                 "??"
 
 
-viewToolbarButton : String -> Msg -> Bool -> Model -> Html Msg
-viewToolbarButton label msg requireSelection model =
+viewToolbarButton : String -> Msg -> (UndoModel -> Bool) -> UndoModel -> Html Msg
+viewToolbarButton label msg isEnabled undoModel =
     let
-        hasNoSelection =
-            List.isEmpty model.selection
-
         buttonAttr =
-            case requireSelection of
-                True ->
-                    [ stopPropagationOnMousedown NoOp
-                    , disabled hasNoSelection
-                    ]
-
-                False ->
-                    []
+            [ stopPropagationOnMousedown NoOp
+            , disabled <| not <| isEnabled undoModel
+            ]
     in
     button
         ([ onClick msg ]
@@ -148,6 +141,34 @@ viewToolbarButton label msg requireSelection model =
             ++ buttonStyle
         )
         [ text label ]
+
+
+{-| isEnabled predicate
+-}
+hasSelection : UndoModel -> Bool
+hasSelection undoModel =
+    not (undoModel.present.selection |> List.isEmpty)
+
+
+{-| isEnabled predicate
+-}
+hasPast : UndoModel -> Bool
+hasPast undoModel =
+    undoModel |> UndoList.hasPast
+
+
+{-| isEnabled predicate
+-}
+hasFuture : UndoModel -> Bool
+hasFuture undoModel =
+    undoModel |> UndoList.hasFuture
+
+
+{-| isEnabled predicate
+-}
+always : UndoModel -> Bool
+always undoModel =
+    True
 
 
 buttonStyle : List (Attribute Msg)
