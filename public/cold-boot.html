@@ -15,14 +15,25 @@
   .btn:hover{ background:#f0f0f0 }
 
   #elmMount{
-    position: relative;   /* <-- contain absolute children to this box */
-    min-height:140px;
-    height:40vh;
-    resize:vertical;
-    overflow:auto;        /* optional; keep Elm inside */
-    padding:0;
+    overflow:auto; /* already present */
   }
-  #elmMount > div{ position:relative; height:100%; }
+
+  /* overlay div that Elm puts before the SVG */
+  #elmMount > div:first-child{
+    position: relative !important;
+    width: 1600px !important;
+    height: 1200px !important;
+  }
+
+  /* the SVG layer */
+  #elmMount svg{
+    position: relative !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 1600px !important;   /* bigger than #elmMount */
+    height: 1200px !important;
+    display: block;
+  }
 
   #jqbar{ display:flex; gap:8px; align-items:center; padding:8px var(--pad) }
   #jq{ flex:1; border:1px solid var(--ring); height:2.1rem; padding:.35rem .55rem; font:13px/1.35 var(--mono) }
@@ -92,35 +103,36 @@
   // ---------- Elm boot ----------
   function bootElm(flags){
     const App = pickElmModule()
-    if (!App) {
-      $status.textContent = 'No Elm module found. Check elm.js build/paths.'
-      return null
-    }
+    if (!App) { $status.textContent = 'No Elm module found. Check elm.js build/paths.'; return null }
+
+    // Outer scrolling container
     const mount = document.createElement('div')
     mount.style.position = 'relative'
-    mount.style.height   = '100%'   // 100% of #elmMount’s 40vh
+    mount.style.height   = '100%'      // fills #elmMount
     mount.style.width    = '100%'
     $mount.replaceChildren(mount)
-    const app = App.init({ node: mount, flags })
+
+    // Inner fixed-size stage that can be larger than the viewport
+    const stage = document.createElement('div')
+    stage.style.position = 'relative'
+    stage.style.width  = '1600px'      // ← tweak as needed
+    stage.style.height = '1200px'      // ← tweak as needed
+    mount.appendChild(stage)
+
+    const app  = App.init({ node: stage, flags })
     const name = (App === window.Elm.AppEmbed ? 'AppEmbed' : App === window.Elm.AppMain ? 'AppMain' : 'Main')
     $status.textContent = `Elm(${name}) flags { slug:"${flags.slug}", storedLen:${flags.stored.length} }`
-    
-    // Send FedWiki page JSON to Elm if the port exists
-    if (app.ports?.pageJson) {
-      try {
-        const raw = JSON.stringify(window.data ?? {})
-        app.ports.pageJson.send(raw)
-        console.log('pageJson → Elm', raw.length, 'bytes')
-      } catch (e) {
-        console.error(e)
-      }
-    }
 
-    // Optional: observe outgoing ports in console (keeps jq panel free)
-    if (app.ports?.store)   app.ports.store.subscribe(v => console.log('store',   String(v).length,   'bytes'))
-    if (app.ports?.persist) app.ports.persist.subscribe(v => console.log('persist', String(v).length,   'bytes'))
+    // (ports wiring unchanged)
+    if (app.ports?.pageJson) {
+      try { const raw = JSON.stringify(window.data ?? {}); app.ports.pageJson.send(raw) } catch {}
+    }
+    if (app.ports?.store)   app.ports.store.subscribe(v => console.log('store', String(v).length, 'bytes'))
+    if (app.ports?.persist) app.ports.persist.subscribe(v => console.log('persist', String(v).length, 'bytes'))
+
     return app
   }
+
 
   // ---------- jq wiring ----------
   let lastRanAt = 0
