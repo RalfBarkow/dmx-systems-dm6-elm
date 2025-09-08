@@ -14,25 +14,37 @@
   .btn{ padding:4px 8px; border:1px solid var(--ring); border-radius:6px; background:#fafafa; cursor:pointer }
   .btn:hover{ background:#f0f0f0 }
 
+  /* Scroll container (already present) */
   #elmMount{
-    overflow:auto; /* already present */
+    overflow:auto;
+    /* keep whatever min-height/height/resize you use */
   }
 
-  /* overlay div that Elm puts before the SVG */
-  #elmMount > div:first-child{
-    position: relative !important;
-    width: 1600px !important;
-    height: 1200px !important;
+  /* Elm root inside #elmMount must be positioned to contain the overlay */
+  #elmMount > div{
+    position:relative;
   }
 
-  /* the SVG layer */
+  /* ✅ The overlay: first child inside Elm root */
+  #elmMount > div > div:first-child{
+    position:absolute !important;
+    left:0 !important;
+    top:0 !important;
+    width:1600px !important;   /* pick your stage size */
+    height:1200px !important;
+    pointer-events:auto !important;
+    z-index:1;                  /* ensure it’s above the SVG */
+  }
+
+  /* The SVG visuals (below the overlay) */
   #elmMount svg{
-    position: relative !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 1600px !important;   /* bigger than #elmMount */
-    height: 1200px !important;
-    display: block;
+    position:relative !important;
+    left:0 !important;
+    top:0 !important;
+    width:1600px !important;    /* same stage size as overlay */
+    height:1200px !important;
+    display:block;
+    z-index:0;
   }
 
   #jqbar{ display:flex; gap:8px; align-items:center; padding:8px var(--pad) }
