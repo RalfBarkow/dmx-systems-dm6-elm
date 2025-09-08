@@ -28,7 +28,7 @@ mainFont =
 
 
 toolbarFontSize =
-    14
+    13
 
 
 contentFontSize =

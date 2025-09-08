@@ -7,6 +7,11 @@ import IconMenu exposing (IconMenuModel, IconMenuMsg)
 import Model exposing (..)
 import Mouse exposing (MouseModel, MouseMsg)
 import Search exposing (SearchModel, SearchMsg)
+import UndoList exposing (UndoList)
+
+
+type alias UndoModel =
+    UndoList Model
 
 
 type alias Model =
@@ -58,6 +63,8 @@ type Msg
     | Nav NavMsg
     | Hide
     | Delete
+    | Undo
+    | Redo
     | Import
     | Export
     | NoOp

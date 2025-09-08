@@ -2,7 +2,7 @@ module MouseAPI exposing (mouseHoverHandler, mouseSubs, updateMouse)
 
 -- components
 
-import AppModel exposing (Model, Msg(..))
+import AppModel exposing (Model, Msg(..), UndoModel)
 import Browser.Events as Events
 import Config exposing (assocDelayMillis, topicH2, topicW2, whiteBoxPadding, whiteBoxRange)
 import Html exposing (Attribute)
@@ -352,9 +352,9 @@ updateDragState ({ mouse } as model) dragState =
 -- SUBSCRIPTIONS
 
 
-mouseSubs : Model -> Sub Msg
-mouseSubs model =
-    case model.mouse.dragState of
+mouseSubs : UndoModel -> Sub Msg
+mouseSubs { present } =
+    case present.mouse.dragState of
         WaitForStartTime _ _ _ _ ->
             Sub.none
 
