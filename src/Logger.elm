@@ -1,6 +1,10 @@
-module Logger exposing (log, toString)
+module Logger exposing (..)
 
 import Debug
+
+
+
+--- DEV LOGGER
 
 
 log : String -> a -> a
