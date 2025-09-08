@@ -1,60 +1,73 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>dm6 wiki console</title>
+<link href="https://cdn.jsdelivr.net/npm/@observablehq/inspector@5.0.1/dist/inspector.min.css" rel="stylesheet">
+<style>
+  body { margin:0; font:14px/1.35 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  #toolbar { padding:8px 10px; border-bottom:1px solid #eee; display:flex; gap:8px; align-items:center; }
+  #app { height:45vh; border-bottom:1px solid #eee; }
+  #jqbar { display:flex; gap:8px; align-items:center; padding:10px; }
+  #jq { flex:1; border:1px solid #ccc; height:2.25rem; padding:.4rem .6rem; font: 13px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  #result { padding:10px; }
+  .spacer { flex:1; } .muted{ color:#666; font-size:12px; }
+  button { padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; background: #fafafa; cursor: pointer; }
+  button:hover { background: #f0f0f0; }
+</style>
 
 <div id="toolbar">
   <button id="bootPage">Boot JSON</button>
   <button id="bootEmpty">Cold {}</button>
-  <span id="status"></span>
+  <span class="spacer"></span>
+  <span id="status" class="muted">waiting…</span>
 </div>
 
 <div id="app"></div>
 
 <div id="jqbar">
-  <label for="jq">jq</label>
-  <input id="jq" placeholder=".title · .story|length · .story[]|.type">
+  <label for="jq" class="muted">jq filter</label>
+  <input id="jq" placeholder=".title | ., .story | length, .story[] | .type" />
   <button id="run">Run</button>
 </div>
 
 <div id="result"></div>
 
-<!-- IMPORTANT: elm.js must be built from AppEmbed.elm (Browser.element) -->
+<!-- IMPORTANT: this elm.js must be built from AppEmbed.elm (Browser.element) -->
 <script src="elm.js"></script>
 
 <!-- jq runtime (globals: window.jq) -->
 <script src="https://dobbs.github.io/wiki-jq/jq.js"></script>
 
-<!-- Small viewer for jq results (no theming needed) -->
 <script type="module">
   import * as frames from 'https://wiki.dbbs.co/assets/v1/frame.js'
   import {Inspector} from 'https://cdn.jsdelivr.net/npm/@observablehq/inspector@5.0.1/+esm'
 
-  // Elements
-  const $mount   = document.getElementById('app')
-  const $status  = document.getElementById('status')
-  const $jq      = document.getElementById('jq')
-  const $run     = document.getElementById('run')
+  const $mount  = document.getElementById('app')
+  const $status = document.getElementById('status')
+  const $jq     = document.getElementById('jq')
+  const $run    = document.getElementById('run')
   const inspector = new Inspector(document.getElementById('result'))
 
-  // Helpers
   const asSlug = t => String(t||'').replace(/\s/g,'-').replace(/[^A-Za-z0-9-]/g,'').toLowerCase()
 
-  function pickElmModule () {
+  function pickElmModule() {
     if (!window.Elm) { console.error('elm.js not loaded'); return null }
+    // Prefer embedded element entrypoint if present
     return window.Elm.AppEmbed || window.Elm.AppMain || window.Elm.Main || null
   }
 
-  function bootElm (flags) {
+  function bootElm(flags){
     const App = pickElmModule()
-    if (!App) { $status.textContent = 'No Elm module found.'; return null }
-
+    if (!App) {
+      $status.textContent = 'No Elm module found. Check elm.js build/paths.'
+      return null
+    }
     const mount = document.createElement('div')
+    mount.style.height = '100%'
     $mount.replaceChildren(mount)
-
-    const app  = App.init({ node: mount, flags })
+    const app = App.init({ node: mount, flags })
     const name = (App === window.Elm.AppEmbed ? 'AppEmbed' : App === window.Elm.AppMain ? 'AppMain' : 'Main')
     $status.textContent = `Elm(${name}) flags { slug:"${flags.slug}", storedLen:${flags.stored.length} }`
-
+    
     // Send FedWiki page JSON to Elm if the port exists
     if (app.ports?.pageJson) {
       try {
@@ -69,16 +82,16 @@
     // Optional: observe outgoing ports in console (keeps jq panel free)
     if (app.ports?.store)   app.ports.store.subscribe(v => console.log('store',   String(v).length,   'bytes'))
     if (app.ports?.persist) app.ports.persist.subscribe(v => console.log('persist', String(v).length,   'bytes'))
-
     return app
   }
 
-  // jq runner against FedWiki page JSON (window.data)
-  async function runJq (filter) {
+  // jq wiring — run filter against FedWiki page JSON (window.data)
+  async function runJq(filter) {
     inspector.pending()
     try {
-      if (!window.jq || typeof window.jq.json !== 'function') throw new Error('jq runtime not loaded')
-      const data   = window.data ?? {}
+      if (!window.jq || typeof window.jq.json !== 'function')
+        throw new Error('jq runtime not loaded (jq.json unavailable)')
+      const data = window.data ?? {}
       const result = await window.jq.json(data, String(filter || '').trim() || '.')
       inspector.fulfilled(result)
     } catch (err) {
@@ -95,22 +108,29 @@
   // FedWiki context handshake
   let ctx = {}
   try {
+    inspector.pending()
     ctx = await frames.context()
+    inspector.fulfilled({ site: ctx.site, title: ctx.title })
   } catch (e) {
-    console.warn('frames.context failed; falling back', e)
-    ctx = { site: location.host, title: document.title || 'dm6-elm-demo', page: {} }
+    inspector.rejected(e)
+    ctx = { site: location.host, title: 'dm6-elm-demo', page: {} }
   }
 
-  // Expose page JSON for jq, derive slug, wire buttons
+  // Expose page JSON for jq, like the jq wiki console
   window.data = ctx.page
-  const slug  = asSlug(ctx.title)
+  const slug = asSlug(ctx.title)
 
-  document.getElementById('bootPage').onclick  = () => bootElm({ slug, stored: JSON.stringify(window.data ?? {}) })
-  document.getElementById('bootEmpty').onclick = () => bootElm({ slug, stored: "{}" })
+  // Buttons: boot Elm with page JSON or {}
+  document.getElementById('bootPage').onclick = () =>
+    bootElm({ slug, stored: JSON.stringify(window.data ?? {}) })
 
-  // First boot + first jq run
+  document.getElementById('bootEmpty').onclick = () =>
+    bootElm({ slug, stored: "{}" })
+
+  // Auto-boot with page JSON and focus jq input
   document.getElementById('bootPage').click()
   $jq.value = '.title'
   $jq.focus()
+  // First run shows something immediately
   runJq($jq.value)
 </script>
