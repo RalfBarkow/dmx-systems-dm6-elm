@@ -1,21 +1,23 @@
-port module AppEmbed exposing (Flags, Model, Msg, main)
+port module AppEmbed exposing (main)
 
 import AppModel as AM
 import Browser
-import Html exposing (Html, div)
+import Html as H
+import Json.Encode as E
 import Main
+import MouseAPI exposing (mouseSubs)
 import Platform.Sub as Sub
 
 
 
--- incoming page JSON from the frame
+-- Incoming page JSON from the frame
 
 
 port pageJson : (String -> msg) -> Sub msg
 
 
 
--- Optional outgoing ports (okay to keep even if unused)
+-- Optional outgoing ports (keep if you use them)
 
 
 port store : String -> Cmd msg
@@ -24,29 +26,20 @@ port store : String -> Cmd msg
 port persist : String -> Cmd msg
 
 
-type alias Model =
-    Main.Model
+
+-- Adapt Main.view (Document) to an element view (Html)
 
 
-type alias Msg =
-    Main.Msg
+viewElement : AM.Model -> H.Html AM.Msg
+viewElement =
+    Main.viewElementMap
 
 
-type alias Flags =
-    Main.Flags
+
+-- render only the map area
 
 
-viewElement : Model -> Html Msg
-viewElement model =
-    let
-        doc =
-            Main.view model
-    in
-    -- render only the body from Main.view inside our mount node
-    div [] doc.body
-
-
-main : Program Flags Model Msg
+main : Program E.Value AM.Model AM.Msg
 main =
     Browser.element
         { init = Main.init
@@ -54,8 +47,8 @@ main =
         , subscriptions =
             \m ->
                 Sub.batch
-                    [ Main.subscriptions m
-                    , pageJson AM.FedWikiPage -- <— wire port → message
+                    [ mouseSubs m
+                    , pageJson AM.FedWikiPage
                     ]
         , view = viewElement
         }
