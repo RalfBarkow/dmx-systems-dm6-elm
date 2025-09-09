@@ -18,21 +18,36 @@
     <!-- 1) load bundle -->
     <script src="main.js"></script>
 
-    <!-- 2) init AFTER window 'load' (guaranteed: Elm is defined) -->
+    <!-- 2) init AFTER window 'load' -->
     <script>
       (function () {
         function init() {
-          if (!window.Elm || !Elm.Main) {
+          if (!window.Elm) {
             console.error('Elm bundle not loaded. window.Elm =', window.Elm);
             return;
           }
+          var Boot = (Elm.AppMain || Elm.Main);
+          if (!Boot) {
+            console.error('No Elm root found. Keys:', Object.keys(Elm));
+            return;
+          }
+
           var flags = null;
           try {
             var raw = localStorage.getItem('dm6-elm');
             flags = raw ? JSON.parse(raw) : null;
           } catch (_) {}
-          window._dm6 = Elm.Main.init({ flags: flags });
+
+          try {
+            window.app = Boot.init({ flags: flags });
+          } catch (e) {
+            try { window.app = Boot.init(); }
+            catch (e2) { console.error('Failed to init Elm app', e2); }
+          }
+          // optional legacy alias
+          window._dm6 = window.app;
         }
+
         if (document.readyState === 'complete') init();
         else window.addEventListener('load', init);
       })();

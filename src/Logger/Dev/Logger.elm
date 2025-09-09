@@ -1,4 +1,4 @@
-module Logger exposing (debug, info, log, toString, warn, withConsole)
+module Dev.Logger exposing (debug, info, log, toString, warn, withConsole)
 
 import Debug
 
