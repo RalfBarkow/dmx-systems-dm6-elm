@@ -20,7 +20,7 @@
   },
   "homepage": "https://github.com/dmx-systems/dm6-elm#readme",
   "scripts": {
-    "dev": "elm-live src/Main.elm --dir=public --open --pushstate --port=8000 --host=localhost -- --debug --output=public/main.js",
+    "dev": "npx elm-live src/Main.elm --dir=public --open --pushstate --port=8000 --host=localhost -- --debug --output=public/main.js",
     "build": "sh build-prod.sh",
     "format": "npx elm-format --yes src tests review",
     "format:check": "npx elm-format --validate src tests review",
