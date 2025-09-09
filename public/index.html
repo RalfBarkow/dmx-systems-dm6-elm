@@ -52,5 +52,33 @@
         else window.addEventListener('load', init);
       })();
     </script>
+    <script>
+      // Dev-only: make the Elm debugger overlay always visible and on top.
+      if (location.hostname === 'localhost') {
+        (function ensureElmDebuggerOnTop() {
+          function promote() {
+            var ov = document.querySelector('.elm-overlay');
+            if (!ov) return;
+            // Move overlay to <body> to escape transformed/overflow parents
+            if (ov.parentNode !== document.body) {
+              document.body.appendChild(ov);
+            }
+            // Force on-top & clickable
+            ov.style.position = 'fixed';
+            ov.style.zIndex = '2147483647';
+            ov.style.pointerEvents = 'auto';
+            // Avoid accidental clipping
+            ov.style.inset = 'auto'; // keep default positions
+          }
+
+          // Try now and on future DOM changes (Elm hot reload, route changes, etc.)
+          var mo = new MutationObserver(promote);
+          mo.observe(document.documentElement, { childList: true, subtree: true });
+          // Also re-run after load
+          if (document.readyState === 'complete') promote();
+          else window.addEventListener('load', promote);
+        })();
+      }
+    </script>
   </body>
 </html>
