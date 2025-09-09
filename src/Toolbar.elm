@@ -30,7 +30,7 @@ import ModelAPI
 import SearchAPI exposing (viewSearchInput)
 import String exposing (fromInt)
 import UndoList
-import Utils exposing (stopPropagationOnMousedown)
+import Utils exposing (info, stopPropagationOnMousedown)
 
 
 
@@ -39,6 +39,10 @@ import Utils exposing (stopPropagationOnMousedown)
 
 viewToolbar : UndoModel -> Html Msg
 viewToolbar ({ present } as undoModel) =
+    let
+        _ =
+            info "viewToolbar" [ UndoList.lengthPast undoModel, UndoList.lengthFuture undoModel ]
+    in
     div
         toolbarStyle
         [ viewMapNav present

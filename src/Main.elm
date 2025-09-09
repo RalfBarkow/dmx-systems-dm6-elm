@@ -193,10 +193,10 @@ update msg ({ present } as undoModel) =
             delete present |> storeModel |> push undoModel
 
         Undo ->
-            ( UndoList.undo undoModel, Cmd.none )
+            undo undoModel
 
         Redo ->
-            ( UndoList.redo undoModel, Cmd.none )
+            redo undoModel
 
         Import ->
             ( present, importJSON () ) |> swap undoModel
@@ -528,3 +528,35 @@ delete model =
     newModel
         |> resetSelection
         |> autoSize
+
+
+
+-- Undo / Redo
+
+
+undo : UndoModel -> ( UndoModel, Cmd Msg )
+undo undoModel =
+    let
+        newUndoModel =
+            UndoList.undo undoModel
+
+        newModel =
+            resetTransientState newUndoModel.present
+    in
+    newModel
+        |> storeModel
+        |> swap newUndoModel
+
+
+redo : UndoModel -> ( UndoModel, Cmd Msg )
+redo undoModel =
+    let
+        newUndoModel =
+            UndoList.redo undoModel
+
+        newModel =
+            resetTransientState newUndoModel.present
+    in
+    newModel
+        |> storeModel
+        |> swap newUndoModel
