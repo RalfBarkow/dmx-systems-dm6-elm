@@ -335,9 +335,7 @@ viewTopicSvg topic props mapPath model =
                 , width (fromFloat (rVal * 2))
                 , height (fromFloat (rVal * 2))
                 , fill "transparent"
-                , attribute "pointer-events" "all"
-                , attribute "data-id" (fromInt topic.id)
-                , attribute "data-path" (fromPath mapPath)
+                , pointerEvents "all" -- << use Svg.Attributes.pointerEvents
                 ]
                 []
             , circle
@@ -697,11 +695,23 @@ htmlTopicAttr id mapPath =
 svgTopicAttr : Id -> MapPath -> List (Svg.Attribute Msg)
 svgTopicAttr id mapPath =
     [ SA.class "dmx-topic topic monad"
-    , attribute "data-id" (fromInt id)
-    , attribute "data-path" (fromPath mapPath)
     , SA.style "cursor: move"
+
+    -- start drag from SVG (bypass global decoder)
     , SE.on "mousedown" (D.map (Mouse << DownItem topicCls id mapPath) posDecoder)
     , SE.on "pointerdown" (D.map (Mouse << DownItem topicCls id mapPath) posDecoder)
+
+    -- keep model updated while dragging, independent from subs timing
+    , SE.on "mousemove" (D.map (Mouse << Move) posDecoder)
+    , SE.on "pointermove" (D.map (Mouse << Move) posDecoder)
+
+    -- finish locally (global onMouseUp also handles it; having both is harmless)
+    , SE.on "mouseup" (D.succeed (Mouse Up))
+    , SE.on "pointerup" (D.succeed (Mouse Up))
+
+    -- helpful for target highlighting during drag
+    , SE.on "mouseenter" (D.succeed (Mouse (Over topicCls id mapPath)))
+    , SE.on "mouseleave" (D.succeed (Mouse (Out topicCls id mapPath)))
     ]
 
 
