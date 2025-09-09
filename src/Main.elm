@@ -175,13 +175,13 @@ update msg ({ present } as undoModel) =
             updateSearch searchMsg undoModel
 
         Edit editMsg ->
-            updateEdit editMsg present |> swap undoModel
+            updateEdit editMsg undoModel
 
         IconMenu iconMenuMsg ->
-            updateIconMenu iconMenuMsg present |> swap undoModel
+            updateIconMenu iconMenuMsg undoModel
 
         Mouse mouseMsg ->
-            updateMouse mouseMsg present |> swap undoModel
+            updateMouse mouseMsg undoModel
 
         Nav navMsg ->
             updateNav navMsg present |> storeModel |> swap undoModel
@@ -307,27 +307,29 @@ switchDisplay displayMode model =
 -- Text Edit
 
 
-updateEdit : EditMsg -> Model -> ( Model, Cmd Msg )
-updateEdit msg model =
+updateEdit : EditMsg -> UndoModel -> ( UndoModel, Cmd Msg )
+updateEdit msg ({ present } as undoModel) =
     case msg of
         EditStart ->
-            startEdit model
+            startEdit present |> push undoModel
 
         OnTextInput text ->
-            onTextInput text model |> storeModel
+            onTextInput text present |> storeModel |> swap undoModel
 
         OnTextareaInput text ->
-            onTextareaInput text model |> storeModelWith
+            onTextareaInput text present |> storeModelWith |> swap undoModel
 
         SetTopicSize topicId mapId size ->
-            ( model
+            ( present
                 |> setTopicSize topicId mapId size
                 |> autoSize
             , Cmd.none
             )
+                |> swap undoModel
 
         EditEnd ->
-            ( endEdit model, Cmd.none )
+            ( endEdit present, Cmd.none )
+                |> swap undoModel
 
 
 startEdit : Model -> ( Model, Cmd Msg )

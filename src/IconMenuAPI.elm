@@ -11,7 +11,7 @@ import Html.Attributes exposing (style, title)
 import Html.Events exposing (onClick)
 import IconMenu exposing (IconMenuMsg(..))
 import Model exposing (..)
-import ModelAPI exposing (getSingleSelection, getTopicInfo, updateTopicInfo)
+import ModelAPI exposing (..)
 import Storage exposing (storeModel)
 import String exposing (fromFloat)
 import Utils exposing (..)
@@ -138,19 +138,20 @@ topicIconStyle =
 -- UPDATE
 
 
-updateIconMenu : IconMenuMsg -> Model -> ( Model, Cmd Msg )
-updateIconMenu msg model =
+updateIconMenu : IconMenuMsg -> UndoModel -> ( UndoModel, Cmd Msg )
+updateIconMenu msg ({ present } as undoModel) =
     case msg of
         Open ->
-            ( openIconMenu model, Cmd.none )
+            ( openIconMenu present, Cmd.none ) |> swap undoModel
 
         Close ->
-            ( closeIconMenu model, Cmd.none )
+            ( closeIconMenu present, Cmd.none ) |> swap undoModel
 
         SetIcon maybeIcon ->
-            setIcon maybeIcon model
+            setIcon maybeIcon present
                 |> closeIconMenu
                 |> storeModel
+                |> push undoModel
 
 
 openIconMenu : Model -> Model

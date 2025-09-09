@@ -19,9 +19,11 @@ import ModelAPI
         , getTopicPos
         , idDecoder
         , pathDecoder
+        , push
         , resetSelection
         , select
         , setTopicPosByDelta
+        , swap
         )
 import Mouse exposing (DragMode(..), DragState(..), MouseMsg(..))
 import Random
@@ -48,29 +50,30 @@ mouseHoverHandler =
 -- UPDATE
 
 
-updateMouse : MouseMsg -> Model -> ( Model, Cmd Msg )
-updateMouse msg model =
+updateMouse : MouseMsg -> UndoModel -> ( UndoModel, Cmd Msg )
+updateMouse msg ({ present } as undoModel) =
     case msg of
         Down ->
-            ( mouseDown model, Cmd.none )
+            ( mouseDown present, Cmd.none ) |> swap undoModel
 
         DownItem class id mapPath pos ->
-            mouseDownOnItem model class id mapPath pos
+            mouseDownOnItem present class id mapPath pos
+                |> push undoModel
 
         Move pos ->
-            mouseMove model pos
+            mouseMove present pos |> swap undoModel
 
         Up ->
-            mouseUp model |> storeModelWith
+            mouseUp present |> storeModelWith |> swap undoModel
 
         Over class id mapPath ->
-            ( mouseOver model class id mapPath, Cmd.none )
+            ( mouseOver present class id mapPath, Cmd.none ) |> swap undoModel
 
         Out class id mapPath ->
-            ( mouseOut model class id mapPath, Cmd.none )
+            ( mouseOut present class id mapPath, Cmd.none ) |> swap undoModel
 
         Time time ->
-            ( timeArrived time model, Cmd.none )
+            ( timeArrived time present, Cmd.none ) |> swap undoModel
 
 
 mouseDown : Model -> Model
