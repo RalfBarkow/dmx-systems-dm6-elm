@@ -1,7 +1,7 @@
-module AppMain exposing (main)
+module AppMain exposing (init, main)
 
 import AppModel as AM
-import Browser exposing (Document)
+import Browser
 import Json.Decode as D
 import Json.Encode as E
 import Main
