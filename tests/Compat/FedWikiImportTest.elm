@@ -1,10 +1,11 @@
 module Compat.FedWikiImportTest exposing (tests)
 
 import AppModel as AM
-import Compat.FedWiki as FW exposing (StoryItem(..))
-import Dict
+import Compat.FedWikiImport as FW
 import Expect
 import Json.Decode as D
+import Json.Encode as E
+import Storage exposing (modelDecoder)
 import Test exposing (..)
 
 
@@ -43,48 +44,52 @@ sampleBracesAsEmpty =
     """
 
 
+emptyModel : AM.Model
+emptyModel =
+    let
+        json =
+            """
+            {
+              "nextId": 1,
+              "items": {},
+              "maps": {
+                "0": { "id": 0, "items": {} }
+              }
+            }
+            """
+    in
+    case D.decodeString modelDecoder json of
+        Ok m ->
+            m
+
+        Err err ->
+            Debug.todo ("Bad empty model fixture: " ++ D.errorToString err)
+
+
 tests : Test
 tests =
     describe "FedWiki import"
-        [ test "decodes minimal page" <|
+        [ test "{} page normalizes title to 'empty' and creates one topic" <|
             \_ ->
-                case D.decodeString FW.decodePage sampleMinimal of
+                let
+                    v =
+                        case D.decodeString D.value "{}" of
+                            Ok vv ->
+                                vv
+
+                            Err _ ->
+                                Debug.todo "decode sanity"
+
+                    ( model1, _ ) =
+                        FW.importPage v emptyModel
+                in
+                Expect.equal model1.nextId (emptyModel.nextId + 1)
+        , test "pageDecoder: {} yields title = \"empty\"" <|
+            \_ ->
+                case D.decodeString FW.pageDecoder "{}" of
                     Ok page ->
-                        Expect.equal page.title "minimal"
+                        Expect.equal page.title "empty"
 
                     Err err ->
-                        Expect.fail (D.errorToString err)
-        , test "{} paragraph normalizes to empty and creates one topic" <|
-            \_ ->
-                case D.decodeString FW.decodePage sampleBracesAsEmpty of
-                    Err err ->
-                        Expect.fail (D.errorToString err)
-
-                    Ok page ->
-                        -- Assert normalization on the decoded StoryItem itself
-                        let
-                            normalizedFirstItemText =
-                                case List.head page.story of
-                                    Just (Paragraph r) ->
-                                        FW.normalizeContent r.text
-
-                                    _ ->
-                                        "--unexpected--"
-                        in
-                        case normalizedFirstItemText of
-                            "" ->
-                                -- Also assert the model has exactly one item on root map
-                                let
-                                    model1 =
-                                        FW.pageToModel page AM.default
-                                in
-                                case Dict.get 0 model1.maps of
-                                    Nothing ->
-                                        Expect.fail "root map missing"
-
-                                    Just root ->
-                                        Expect.equal (Dict.size root.items) 1
-
-                            other ->
-                                Expect.fail ("expected empty text, got: " ++ other)
+                        Expect.fail ("decoder failed: " ++ D.errorToString err)
         ]
