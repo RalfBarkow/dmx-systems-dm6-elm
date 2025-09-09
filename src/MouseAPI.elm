@@ -96,29 +96,36 @@ timeArrived time model =
         -- after first move; decide DragTopic vs DrawAssoc by delay
         WaitForEndTime startTime class id mapPath pos ->
             let
-                delay =
-                    posixToMillis time - posixToMillis startTime > assocDelayMillis
-
-                dragMode =
-                    if delay then
-                        DrawAssoc
-
-                    else
-                        DragTopic
-
-                mapId =
-                    getMapId mapPath
-
-                origPos_ =
-                    getTopicPos id mapId model.maps
+                isTopic =
+                    String.contains "dmx-topic" class
             in
-            case origPos_ of
-                Just origPos ->
-                    updateDragState model (Drag dragMode id mapPath origPos pos Nothing)
+            if not isTopic then
+                model
 
-                Nothing ->
-                    -- nothing to do; stay as-is
-                    model
+            else
+                let
+                    delay =
+                        posixToMillis time - posixToMillis startTime > assocDelayMillis
+
+                    dragMode =
+                        if delay then
+                            DrawAssoc
+
+                        else
+                            DragTopic
+
+                    mapId =
+                        getMapId mapPath
+
+                    origPos_ =
+                        getTopicPos id mapId model.maps
+                in
+                case origPos_ of
+                    Just origPos ->
+                        updateDragState model (Drag dragMode id mapPath origPos pos Nothing)
+
+                    Nothing ->
+                        model
 
         -- while *engaged* or actually *dragging*, ignore extra ticks
         DragEngaged _ _ _ _ _ ->
@@ -382,21 +389,18 @@ timeTick =
 mouseSubs : Model -> Sub Msg
 mouseSubs model =
     case model.mouse.dragState of
-        -- waiting to engage/finish → we need the timing ticks
         WaitForStartTime _ _ _ _ ->
             timeTick
 
         WaitForEndTime _ _ _ _ _ ->
             timeTick
 
-        -- dragging → just global mouse move/up; no timer needed
         DragEngaged _ _ _ _ _ ->
             dragSub
 
         Drag _ _ _ _ _ _ ->
             dragSub
 
-        -- idle → only listen for initial down/hover
         NoDrag ->
             mouseDownSub
 
