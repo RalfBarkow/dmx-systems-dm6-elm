@@ -24,7 +24,7 @@ date =
 
 newTopicPos : Point
 newTopicPos =
-    Point 86 80
+    Point 186 180
 
 
 mainFont : String

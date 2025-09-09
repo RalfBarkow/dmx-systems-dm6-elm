@@ -3,9 +3,10 @@ module ModelAPI exposing (..)
 import AppModel exposing (..)
 import Config exposing (..)
 import Dict
+import Json.Decode as D
+import Logger as L
 import Model exposing (..)
 import String exposing (fromInt)
-import UndoList
 import Utils exposing (..)
 
 
@@ -457,7 +458,7 @@ addItemToMap itemId props mapId model =
 
         -- hidden=False, pinned=False
         _ =
-            info "addItemToMap"
+            L.log "addItemToMap"
                 { itemId = itemId, parentAssocId = parentAssocId, props = props, mapId = mapId }
     in
     { newModel
@@ -622,11 +623,6 @@ select itemId mapPath model =
     { model | selection = [ ( itemId, mapPath ) ] }
 
 
-resetSelection : Model -> Model
-resetSelection model =
-    { model | selection = [] }
-
-
 isSelected : Id -> MapId -> Model -> Bool
 isSelected itemId mapId model =
     model.selection
@@ -652,22 +648,34 @@ getSingleSelection model =
 
 
 
--- Undo / Redo
+-- Decoder
 
 
-push : UndoModel -> ( Model, Cmd Msg ) -> ( UndoModel, Cmd Msg )
-push undoModel ( model, cmd ) =
-    ( UndoList.new model undoModel, cmd )
+idDecoder : String -> D.Decoder Id
+idDecoder str =
+    case String.toInt str of
+        Just int ->
+            D.succeed int
+
+        Nothing ->
+            D.fail <| "\"" ++ str ++ "\" is a malformed ID"
 
 
-swap : UndoModel -> ( Model, Cmd Msg ) -> ( UndoModel, Cmd Msg )
-swap undoModel ( model, cmd ) =
-    ( UndoList.mapPresent (\_ -> model) undoModel, cmd )
+pathDecoder : String -> D.Decoder MapPath
+pathDecoder str =
+    D.succeed
+        (str
+            |> String.split ","
+            |> List.map
+                (\mapIdStr ->
+                    case mapIdStr |> String.toInt of
+                        Just mapId ->
+                            mapId
 
-
-reset : ( Model, Cmd Msg ) -> ( UndoModel, Cmd Msg )
-reset ( model, cmd ) =
-    ( UndoList.fresh model, cmd )
+                        Nothing ->
+                            logError "pathDecoder" ("\"" ++ mapIdStr ++ "\" is a malformed ID") -1
+                )
+        )
 
 
 
@@ -676,17 +684,17 @@ reset ( model, cmd ) =
 
 itemNotInMap : String -> Id -> Id -> a -> a
 itemNotInMap funcName itemId mapId val =
-    logError funcName ("item " ++ fromInt itemId ++ " not in map " ++ fromInt mapId) val
+    Utils.logError funcName ("item " ++ fromInt itemId ++ " not in map " ++ fromInt mapId) val
 
 
 topicMismatch : String -> Id -> a -> a
 topicMismatch funcName id val =
-    logError funcName (fromInt id ++ " is not a Topic but an Assoc") val
+    Utils.logError funcName (fromInt id ++ " is not a Topic but an Assoc") val
 
 
 assocMismatch : String -> Id -> a -> a
 assocMismatch funcName id val =
-    logError funcName (fromInt id ++ " is not an Assoc but a Topic") val
+    Utils.logError funcName (fromInt id ++ " is not an Assoc but a Topic") val
 
 
 illegalMapId : String -> Id -> a -> a
@@ -701,4 +709,4 @@ illegalItemId funcName id val =
 
 illegalId : String -> String -> Id -> a -> a
 illegalId funcName item id val =
-    logError funcName (fromInt id ++ " is an illegal " ++ item ++ " ID") val
+    Utils.logError funcName (fromInt id ++ " is an illegal " ++ item ++ " ID") val
