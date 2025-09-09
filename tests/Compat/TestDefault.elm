@@ -1,21 +1,16 @@
 module Compat.TestDefault exposing (defaultModel, suite)
 
 import AppMain as AdapterMain
+import AppModel as AM
 import Dict
 import Expect
 import Json.Encode as E
-import Main as CoreMain
 import Test exposing (..)
 
 
-
--- Provide a canonical empty model for tests that need a ready-to-use default.
--- Uses CoreMain.init with explicit Flags (stored="{}").
-
-
-defaultModel : CoreMain.Model
+defaultModel : AM.Model
 defaultModel =
-    Tuple.first (CoreMain.init { slug = "test", stored = "{}" })
+    Tuple.first (AdapterMain.init E.null)
 
 
 

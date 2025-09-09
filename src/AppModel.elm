@@ -95,4 +95,5 @@ type Msg
     | Search SearchMsg
     | IconMenu IconMenuMsg
       -- Federated Wiki
+    | SetFedWikiRaw String
     | FedWikiPage String

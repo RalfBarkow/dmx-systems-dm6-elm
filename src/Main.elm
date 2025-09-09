@@ -4,12 +4,13 @@ import AppModel exposing (..)
 import Boxing exposing (boxContainer, unboxContainer)
 import Browser
 import Browser.Dom as Dom
+import Compat.FedWiki as FedWiki
 import Compat.ModelAPI as ModelAPI exposing (addItemToMap)
 import Config exposing (..)
 import Dict
-import FedWiki
-import Html exposing (Attribute, Html, br, div, text)
-import Html.Attributes exposing (id, style)
+import Html exposing (Attribute, Html, br, button, div, text, textarea)
+import Html.Attributes as HA exposing (id, style)
+import Html.Events as HE
 import IconMenuAPI exposing (updateIconMenu, viewIconMenu)
 import Json.Decode as D
 import Json.Encode as E
@@ -147,6 +148,14 @@ view model =
             [ text model.measureText
             , br [] []
             ]
+        , textarea
+            [ HA.rows 6
+            , HA.cols 60
+            , HA.value model.fedWikiRaw
+            , HE.onInput SetFedWikiRaw
+            ]
+            []
+        , button [ HE.onClick (FedWikiPage model.fedWikiRaw) ] [ text "Import" ]
         ]
 
 
@@ -192,12 +201,21 @@ update msg model =
                     L.log "update" msg
     in
     case msg of
+        SetFedWikiRaw s ->
+            ( { model | fedWikiRaw = s }, Cmd.none )
+                |> traceWith "fedwiki.raw" ("len=" ++ String.fromInt (String.length s))
+
         FedWikiPage raw ->
-            ( model
-                |> FedWiki.renderAsMonad raw
-                |> (\m -> { m | fedWikiRaw = raw })
-            , Cmd.none
-            )
+            let
+                newModel =
+                    case D.decodeString FedWiki.decodePage raw of
+                        Ok page ->
+                            FedWiki.pageToModel page model
+
+                        Err _ ->
+                            model
+            in
+            ( { newModel | fedWikiRaw = raw }, Cmd.none )
                 |> traceWith "fedwiki" ("len=" ++ String.fromInt (String.length raw))
 
         AddTopic ->
