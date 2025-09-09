@@ -4,16 +4,17 @@ set -euo pipefail
 # --- paths & files ------------------------------------------------------------
 js="main.js"
 min="main.min.js"
-template="index.html"           # HTML template containing <script src="main.js">
+template="public/index.html"           # HTML template containing <script src="main.js">
 html="public/dm6-elm.html"      # final standalone output
 tools_js_src="scripts/localstorage-tools.js"
 
-log_dst="src/Log.elm"
-log_prod_src="src/Log/Prod.elm"
-log_dev_src="src/Log/Dev.elm"   # just to assert it exists
+log_dst="src/Logger.elm"
+log_prod_src="src/Logger/Prod/Logger.elm"
+log_dev_src="src/Logger/Dev/Logger.elm"   # must exist
 
 # --- guards -------------------------------------------------------------------
 in_git() { git rev-parse --is-inside-work-tree >/dev/null 2>&1; }
+is_tracked() { git ls-files --error-unmatch "$1" >/dev/null 2>&1; }
 
 if ! in_git; then
   echo "ERROR: build-prod.sh expects to run inside a git worktree." >&2
@@ -25,42 +26,52 @@ fi
 [ -f "$template" ]     || { echo "ERROR: $template missing."     >&2; exit 1; }
 command -v uglifyjs >/dev/null 2>&1 || { echo "ERROR: uglify-js not found (npm i -D uglify-js)." >&2; exit 1; }
 
-# --- restore helper -----------------------------------------------------------
-restore_file() {
-  # Try to restore from git; if not tracked (or restore fails), fall back to Dev copy.
-  local f="$1"
-  git restore --staged --worktree -- "$f" >/dev/null 2>&1 || \
-  git checkout -- "$f"               >/dev/null 2>&1 || \
-  { [ -f "$log_dev_src" ] && cp -f "$log_dev_src" "$f"; } || true
-}
-
+# --- cleanup: restore tracked file via git; fallback to Dev copy ------------
 cleanup() {
-  # Never fail during cleanup
   set +e
-  restore_file "$log_dst"
+  if in_git && is_tracked "$log_dst"; then
+    git restore --worktree --staged -- "$log_dst" || git checkout -- "$log_dst"
+  else
+    # Fallback for non-git or untracked file: restore Dev variant and normalize header
+    cp -f "$log_dev_src" "$log_dst"
+    awk 'NR==1{
+           if ($0 ~ /^module[[:space:]]+[^[:space:]]+[[:space:]]+exposing[[:space:]]*\(.*\)/) {
+             sub(/^module[[:space:]]+[^[:space:]]+/, "module Logger")
+           } else {
+             $0 = "module Logger exposing (..)"
+           }
+         }1' "$log_dst" > "$log_dst.tmp" && mv "$log_dst.tmp" "$log_dst"
+  fi
   set -e
 }
 trap cleanup EXIT
 
+
 # --- put PROD logger in place -------------------------------------------------
 cp -f "$log_prod_src" "$log_dst"
 
-# Ensure module header matches file path: "module Log exposing (...)"
-# (Accepts any exposing list, preserves it.)
+# Ensure module header matches file path: change only the module name, keep exposing list
 awk 'NR==1 {
-        if ($0 ~ /^module[[:space:]]+Log\.Prod[[:space:]]+exposing[[:space:]]*\(.*\)/) {
-            sub(/^module[[:space:]]+Log\.Prod/, "module Log")
-        } else if ($0 !~ /^module[[:space:]]+Log[[:space:]]+exposing[[:space:]]*\(.*\)/) {
-            # if someone changed the header to something else, force it
-            sub(/^module[[:space:]]+.*/, "module Log exposing (debug, info, warn, withConsole, log)")
+        # Cases:
+        # 1) module Logger.Prod exposing (...)
+        if ($0 ~ /^module[[:space:]]+Logger\.Prod[[:space:]]+exposing[[:space:]]*\(.*\)/) {
+            sub(/^module[[:space:]]+Logger\.Prod/, "module Logger")
+        }
+        # 2) module <Anything> exposing (...)  -> rename to Logger, keep exposing list
+        else if ($0 ~ /^module[[:space:]]+[^[:space:]]+[[:space:]]+exposing[[:space:]]*\(.*\)/) {
+            sub(/^module[[:space:]]+[^[:space:]]+/, "module Logger")
+        }
+        # 3) Fallback: if header is weird/missing exposing, use (..)
+        if ($0 !~ /^module[[:space:]]+Logger[[:space:]]+exposing[[:space:]]*\(.*\)/) {
+            $0 = "module Logger exposing (..)"
         }
      } { print }' "$log_dst" > "$log_dst.tmp" && mv "$log_dst.tmp" "$log_dst"
 
-# Optional: ensure old imports that used `log` still work by defining alias.
-# (No-op if already present.)
+
+# Back-compat alias (older code might import Logger.log explicitly)
 grep -q '^log[[:space:]]*:' "$log_dst" 2>/dev/null || cat >> "$log_dst" <<'EOF'
 
--- Back-compat alias (older code imports `Log.log`)
+-- Back-compat alias (older code imports `Logger.log`)
 log : String -> a -> a
 log =
     debug
@@ -111,7 +122,7 @@ awk -v jsfile="$tmp_js_escaped" -v toolsfile="$tmp_tools_escaped" '
       printf "%s", tools
       print "  </script>"
 
-      # >>> add this block to subscribe to Console.log port in PROD output <<<
+      # Subscribe to Logger port if present (safe no-op otherwise)
       print "  <script>"
       print "    (function(){"
       print "      try {"
@@ -121,7 +132,6 @@ awk -v jsfile="$tmp_js_escaped" -v toolsfile="$tmp_tools_escaped" '
       print "      } catch (e) { /* ignore */ }"
       print "    })();"
       print "  </script>"
-      # <<< end added block >>>
 
       injected = 1
       print
@@ -135,7 +145,6 @@ awk -v jsfile="$tmp_js_escaped" -v toolsfile="$tmp_tools_escaped" '
     if (!injected)  { print "ERROR: Could not inject tools (no </body> seen)." > "/dev/stderr"; exit 43 }
   }
 ' "$template" > "$html"
-
 
 rm -f "$tmp_js_escaped" "$tmp_tools_escaped"
 

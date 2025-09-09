@@ -1,4 +1,4 @@
-module Logger exposing (..)
+module Prod.Logger exposing (..)
 
 --- PROD LOGGER
 
