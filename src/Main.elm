@@ -13,7 +13,7 @@ import Html.Attributes exposing (id, style)
 import IconMenuAPI exposing (updateIconMenu, viewIconMenu)
 import Json.Decode as D
 import Json.Encode as E
-import Log exposing (info)
+import Logger as L
 import MapAutoSize exposing (autoSize)
 import MapRenderer exposing (viewMap)
 import Model exposing (..)
@@ -24,7 +24,7 @@ import Storage exposing (modelDecoder, storeModel, storeModelWith)
 import String exposing (fromFloat, fromInt)
 import Task
 import UI.Toolbar exposing (viewToolbar)
-import Utils exposing (..)
+import Utils as U
 
 
 
@@ -45,7 +45,7 @@ trace : String -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
 trace tag (( m, cmd ) as result) =
     let
         _ =
-            Log.info ("update." ++ tag) ""
+            L.log ("update." ++ tag) ""
     in
     result
 
@@ -54,7 +54,7 @@ traceWith : String -> String -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
 traceWith tag payload (( m, cmd ) as result) =
     let
         _ =
-            Log.info
+            L.log
                 ("update."
                     ++ tag
                     ++ (if payload == "" then
@@ -98,7 +98,7 @@ init flags =
         Ok True ->
             let
                 _ =
-                    Log.info "init" "localStorage: empty"
+                    L.log "init" "localStorage: empty"
             in
             default
 
@@ -107,15 +107,15 @@ init flags =
                 Ok model ->
                     let
                         _ =
-                            Log.info "init"
-                                ("localStorage: " ++ (model |> toString |> String.length |> fromInt) ++ " bytes")
+                            L.log "init"
+                                ("localStorage: " ++ (model |> L.toString |> String.length |> fromInt) ++ " bytes")
                     in
                     model
 
                 Err e ->
                     let
                         _ =
-                            logError "init" "localStorage" e
+                            U.logError "init" "localStorage" e
                     in
                     default
     , Cmd.none
@@ -189,7 +189,7 @@ update msg model =
                     msg
 
                 _ ->
-                    Log.info "update" msg
+                    L.log "update" msg
     in
     case msg of
         FedWikiPage raw ->
@@ -428,7 +428,7 @@ onTextInput text model =
                 model
 
         NoEdit ->
-            logError "onTextInput" "called when editState is NoEdit" model
+            U.logError "onTextInput" "called when editState is NoEdit" model
 
 
 onTextareaInput : String -> Model -> ( Model, Cmd Msg )
@@ -441,7 +441,7 @@ onTextareaInput text model =
                 |> measureText text topicId mapId
 
         NoEdit ->
-            logError "onTextareaInput" "called when editState is NoEdit" ( model, Cmd.none )
+            U.logError "onTextareaInput" "called when editState is NoEdit" ( model, Cmd.none )
 
 
 measureText : String -> Id -> MapId -> Model -> ( Model, Cmd Msg )
@@ -459,7 +459,7 @@ measureText text topicId mapId model =
                             )
 
                     Err err ->
-                        logError "measureText" (toString err) NoOp
+                        U.logError "measureText" (L.toString err) NoOp
             )
     )
 
@@ -479,7 +479,7 @@ focus model =
                     "dmx-input-" ++ fromInt id ++ "-" ++ fromInt mapId
 
                 NoEdit ->
-                    logError "focus" "called when editState is NoEdit" ""
+                    U.logError "focus" "called when editState is NoEdit" ""
     in
     Dom.focus nodeId
         |> Task.attempt
@@ -489,7 +489,7 @@ focus model =
                         NoOp
 
                     Err e ->
-                        logError "focus" (toString e) NoOp
+                        U.logError "focus" (L.toString e) NoOp
             )
 
 
@@ -535,7 +535,7 @@ back model =
                     )
 
                 _ ->
-                    logError "back" "model.mapPath has a problem" ( 0, [ 0 ], [] )
+                    U.logError "back" "model.mapPath has a problem" ( 0, [ 0 ], [] )
     in
     { model
         | mapPath = mapPath

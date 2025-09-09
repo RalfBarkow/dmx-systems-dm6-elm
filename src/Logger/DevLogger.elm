@@ -1,4 +1,4 @@
-module Log.Dev exposing (debug, info, log, warn, withConsole)
+module Logger exposing (debug, info, log, toString, warn, withConsole)
 
 import Debug
 
@@ -18,11 +18,6 @@ debug label v =
     Debug.log ("🐛 " ++ label) v
 
 
-
--- Log a message without dumping huge values (like the model).
--- Works in pipelines:  foo |> withConsole "clicked"
-
-
 withConsole : String -> a -> a
 withConsole message v =
     let
@@ -33,9 +28,18 @@ withConsole message v =
 
 
 
--- Back-compat
+-- Back-compat alias
 
 
 log : String -> a -> a
 log =
     debug
+
+
+
+-- Used by Utils to pretty-print values
+
+
+toString : a -> String
+toString =
+    Debug.toString

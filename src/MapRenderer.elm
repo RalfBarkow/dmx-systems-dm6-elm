@@ -66,7 +66,7 @@ import Utils exposing (..)
 
 topicCls : Class
 topicCls =
-    "topic monad"
+    "dmx-topic"
 
 
 
@@ -336,6 +336,8 @@ viewTopicSvg topic props mapPath model =
                 , height (fromFloat (rVal * 2))
                 , fill "transparent"
                 , attribute "pointer-events" "all"
+                , attribute "data-id" (fromInt topic.id)
+                , attribute "data-path" (fromPath mapPath)
                 ]
                 []
             , circle
@@ -407,11 +409,11 @@ viewTopic topic props mapPath model =
             topicFunc topic props mapPath model
     in
     div
-        (topicAttr topic.id mapPath
+        (htmlTopicAttr topic.id mapPath
             ++ topicStyle topic.id model
             ++ style
         )
-        children
+        (dragHandle topic.id mapPath :: children)
 
 
 effectiveDisplayMode : Id -> DisplayMode -> Model -> DisplayMode
@@ -673,26 +675,33 @@ mapItemCount topicId props model =
     ]
 
 
-topicAttr : Id -> MapPath -> List (Attribute Msg)
-topicAttr id mapPath =
-    [ class "topic monad"
+
+-- HTML topics
+
+
+htmlTopicAttr : Id -> MapPath -> List (Attribute Msg)
+htmlTopicAttr id mapPath =
+    [ class "dmx-topic topic monad"
+    , attribute "data-id" (fromInt id)
+    , attribute "data-path" (fromPath mapPath)
     , style "cursor" "move"
     , on "mousedown" (D.map (Mouse << DownItem topicCls id mapPath) posDecoder)
-    , on "mouseenter" (D.succeed (Mouse (Over topicCls id mapPath)))
-    , on "mousemove" (D.succeed (Mouse (Over topicCls id mapPath)))
-    , on "mouseup" (D.succeed (Mouse Up))
+    , on "pointerdown" (D.map (Mouse << DownItem topicCls id mapPath) posDecoder)
     ]
+
+
+
+-- SVG monads
 
 
 svgTopicAttr : Id -> MapPath -> List (Svg.Attribute Msg)
 svgTopicAttr id mapPath =
-    [ SA.class "topic monad"
-    , attribute "pointer-events" "bounding-box"
+    [ SA.class "dmx-topic topic monad"
+    , attribute "data-id" (fromInt id)
+    , attribute "data-path" (fromPath mapPath)
     , SA.style "cursor: move"
     , SE.on "mousedown" (D.map (Mouse << DownItem topicCls id mapPath) posDecoder)
-    , SE.on "mouseenter" (D.succeed (Mouse (Over topicCls id mapPath)))
-    , SE.on "mousemove" (D.succeed (Mouse (Over topicCls id mapPath)))
-    , SE.on "mouseup" (D.succeed (Mouse Up))
+    , SE.on "pointerdown" (D.map (Mouse << DownItem topicCls id mapPath) posDecoder)
     ]
 
 
@@ -1248,3 +1257,26 @@ posDecoder =
     D.map2 Point
         (D.field "clientX" D.float)
         (D.field "clientY" D.float)
+
+
+dragHandle : Id -> MapPath -> Html Msg
+dragHandle id mapPath =
+    div
+        [ attribute "data-drag-handle" "1"
+        , attribute "title" "Drag handle"
+        , style "position" "absolute"
+        , style "left" "-6px"
+        , style "top" "-6px"
+        , style "width" "12px"
+        , style "height" "12px"
+        , style "border" "2px solid #f40"
+        , style "border-radius" "50%"
+        , style "background" "rgba(255,64,0,0.2)"
+        , style "cursor" "move"
+        , style "z-index" "999"
+        , on "mousedown" (D.map (Mouse << DownItem topicCls id mapPath) posDecoder)
+        , on "mouseenter" (D.succeed (Mouse (Over topicCls id mapPath)))
+        , on "mousemove" (D.succeed (Mouse (Over topicCls id mapPath)))
+        , on "mouseup" (D.succeed (Mouse Up))
+        ]
+        []

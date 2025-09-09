@@ -4,6 +4,7 @@ import AppModel exposing (..)
 import Config exposing (..)
 import Dict
 import Json.Decode as D
+import Logger as L
 import Model exposing (..)
 import String exposing (fromInt)
 import Utils exposing (..)
@@ -457,7 +458,7 @@ addItemToMap itemId props mapId model =
 
         -- hidden=False, pinned=False
         _ =
-            info "addItemToMap"
+            L.log "addItemToMap"
                 { itemId = itemId, parentAssocId = parentAssocId, props = props, mapId = mapId }
     in
     { newModel
@@ -683,17 +684,17 @@ pathDecoder str =
 
 itemNotInMap : String -> Id -> Id -> a -> a
 itemNotInMap funcName itemId mapId val =
-    logError funcName ("item " ++ fromInt itemId ++ " not in map " ++ fromInt mapId) val
+    Utils.logError funcName ("item " ++ fromInt itemId ++ " not in map " ++ fromInt mapId) val
 
 
 topicMismatch : String -> Id -> a -> a
 topicMismatch funcName id val =
-    logError funcName (fromInt id ++ " is not a Topic but an Assoc") val
+    Utils.logError funcName (fromInt id ++ " is not a Topic but an Assoc") val
 
 
 assocMismatch : String -> Id -> a -> a
 assocMismatch funcName id val =
-    logError funcName (fromInt id ++ " is not an Assoc but a Topic") val
+    Utils.logError funcName (fromInt id ++ " is not an Assoc but a Topic") val
 
 
 illegalMapId : String -> Id -> a -> a
@@ -708,4 +709,4 @@ illegalItemId funcName id val =
 
 illegalId : String -> String -> Id -> a -> a
 illegalId funcName item id val =
-    logError funcName (fromInt id ++ " is an illegal " ++ item ++ " ID") val
+    Utils.logError funcName (fromInt id ++ " is an illegal " ++ item ++ " ID") val

@@ -1,4 +1,4 @@
-module Log exposing (debug, info, log, warn, withConsole)
+module Logger exposing (debug, info, log, toString, warn, withConsole)
 
 import Debug
 
@@ -18,10 +18,6 @@ debug label v =
     Debug.log ("🐛 " ++ label) v
 
 
-
--- value-in / value-out logger for pipelines
-
-
 withConsole : String -> a -> a
 withConsole message v =
     let
@@ -38,3 +34,12 @@ withConsole message v =
 log : String -> a -> a
 log =
     debug
+
+
+
+-- Used by Utils to pretty-print values
+
+
+toString : a -> String
+toString =
+    Debug.toString

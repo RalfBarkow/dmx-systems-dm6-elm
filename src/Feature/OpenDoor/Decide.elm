@@ -2,7 +2,7 @@ module Feature.OpenDoor.Decide exposing (decideOpenDoorMsg)
 
 import AppModel exposing (Model, Msg(..))
 import Dict
-import Log exposing (info)
+import Logger as L
 import Model exposing (..)
 import ModelAPI exposing (activeMap, getSingleSelection)
 
@@ -43,7 +43,7 @@ decideOpenDoorMsg model =
         Nothing ->
             let
                 _ =
-                    info "Cross" { reason = "no selection" }
+                    L.log "Cross" { reason = "no selection" }
             in
             Nothing
 
@@ -71,14 +71,14 @@ decideOpenDoorMsg model =
                 if selectionMapId == here then
                     let
                         _ =
-                            info "Cross (enter container)" { container = topicId }
+                            L.log "Cross (enter container)" { container = topicId }
                     in
                     Just (Nav Fullscreen)
 
                 else
                     let
                         _ =
-                            info "Cross (exit container)" { container = selectionMapId }
+                            L.log "Cross (exit container)" { container = selectionMapId }
                     in
                     Just (Nav Back)
 
@@ -88,7 +88,7 @@ decideOpenDoorMsg model =
                     Just containerId ->
                         let
                             _ =
-                                info "Cross (parent→inner)" { topicId = topicId, src = here, dst = containerId }
+                                L.log "Cross (parent→inner)" { topicId = topicId, src = here, dst = containerId }
                         in
                         Just (MoveTopicToMap topicId here origin topicId (containerId :: model.mapPath) origin)
 
@@ -96,7 +96,7 @@ decideOpenDoorMsg model =
                         -- no container on parent; do a no-op move for consistency
                         let
                             _ =
-                                info "Cross (no-op)" { reason = "no owning container on parent", topicId = topicId, parent = here }
+                                L.log "Cross (no-op)" { reason = "no owning container on parent", topicId = topicId, parent = here }
                         in
                         Just (MoveTopicToMap topicId here origin topicId model.mapPath origin)
 
@@ -109,14 +109,14 @@ decideOpenDoorMsg model =
                                 mapIdOf parentPath
 
                             _ =
-                                info "Cross (inner→parent)" { topicId = topicId, src = selectionMapId, dst = parentId }
+                                L.log "Cross (inner→parent)" { topicId = topicId, src = selectionMapId, dst = parentId }
                         in
                         Just (MoveTopicToMap topicId selectionMapId origin topicId parentPath origin)
 
                     Nothing ->
                         let
                             _ =
-                                info "Cross disabled" { reason = "inner map has no parent", inner = selectionMapId }
+                                L.log "Cross disabled" { reason = "inner map has no parent", inner = selectionMapId }
                         in
                         Nothing
 

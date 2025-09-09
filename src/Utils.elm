@@ -3,17 +3,7 @@ module Utils exposing (..)
 import Html exposing (Attribute, Html, br, text)
 import Html.Events exposing (keyCode, on, stopPropagationOn)
 import Json.Decode as D
-import Log exposing (log)
-
-
-
--- Production-safe stringify stub (no Debug).
--- If you want real strings in dev, you can conditionally swap this via your build.
-
-
-toString : a -> String
-toString _ =
-    ""
+import Logger
 
 
 
@@ -74,19 +64,19 @@ multilineHtml str =
 
 logError : String -> String -> v -> v
 logError funcName text val =
-    log ("### ERROR @" ++ funcName ++ ": " ++ text) val
+    Logger.log ("### ERROR @" ++ funcName ++ ": " ++ text) val
 
 
 fail : String -> a -> v -> v
 fail funcName args val =
-    log ("--> @" ++ funcName ++ " failed " ++ toString args) val
+    Logger.log ("--> @" ++ funcName ++ " failed " ++ Logger.toString args) val
 
 
 call : String -> a -> v -> v
 call funcName args val =
-    log ("@" ++ funcName ++ " " ++ toString args ++ " -->") val
+    Logger.log ("@" ++ funcName ++ " " ++ Logger.toString args ++ " -->") val
 
 
 info : String -> v -> v
 info funcName val =
-    log ("@" ++ funcName) val
+    Logger.log ("@" ++ funcName) val
