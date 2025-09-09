@@ -148,14 +148,6 @@ view model =
             [ text model.measureText
             , br [] []
             ]
-        , textarea
-            [ HA.rows 6
-            , HA.cols 60
-            , HA.value model.fedWikiRaw
-            , HE.onInput SetFedWikiRaw
-            ]
-            []
-        , button [ HE.onClick (FedWikiPage model.fedWikiRaw) ] [ text "Import" ]
         ]
 
 
