@@ -264,7 +264,15 @@ update msg model =
             ( model, Cmd.none )
 
 
-moveTopicToMap : Id -> MapId -> Point -> Id -> MapPath -> Point -> Model -> Model
+moveTopicToMap :
+    Id -- topicId
+    -> MapId -- sourceMapId   (the map you’re moving FROM; for inner map this equals containerId)
+    -> Point -- origPos       (pos on source map; not used for topology)
+    -> MapId -- targetMapId   (the map you’re moving TO; e.g. 0 for root)
+    -> MapPath -- targetMapPath (usually [ targetMapId ])
+    -> Point -- newPos        (pos on target map)
+    -> Model
+    -> Model
 moveTopicToMap topicId mapId origPos targetId targetMapPath pos model =
     let
         ( newModel, created ) =
