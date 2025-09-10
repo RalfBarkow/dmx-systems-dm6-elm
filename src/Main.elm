@@ -5,8 +5,8 @@ import Boxing exposing (boxContainer, unboxContainer)
 import Browser
 import Browser.Dom as Dom
 import Compat.FedWiki as FW
-import Compat.ModelAPI exposing (addItemToMap)
-import Config exposing (..)
+import Compat.ModelAPI as CMA
+import Config exposing (contentFontSize, mainFont, topicBorderWidth, topicDefaultText, topicDetailMaxWidth, topicDetailPadding, topicLineHeight, topicSize)
 import Dict
 import Html exposing (Attribute, Html, br, div, text)
 import Html.Attributes exposing (id, style)
@@ -17,7 +17,7 @@ import Logger as L
 import MapAutoSize exposing (autoSize)
 import MapRenderer exposing (viewMap)
 import Model exposing (..)
-import ModelAPI exposing (activeMap, createMap, createTopicIn, deleteItem, getMapId, getSingleSelection, getTopicProps, hasMap, hideItem, isItemInMap, select, setDisplayMode, setTopicPos, setTopicSize, updateMapRect, updateTopicInfo, updateTopicProps)
+import ModelAPI exposing (activeMap, createMap, createTopicIn, deleteItem, getMapId, getSingleSelection, hasMap, hideItem, isItemInMap, setDisplayMode, setTopicSize, updateMapRect, updateTopicInfo, updateTopicProps)
 import MouseAPI exposing (mouseHoverHandler, mouseSubs, updateMouse)
 import SearchAPI exposing (updateSearch, viewResultMenu)
 import Storage exposing (modelDecoder, storeModel, storeModelWith)
@@ -141,8 +141,8 @@ view model =
                 ++ viewIconMenu model
             )
         , div
-            ([ id "measure" ]
-                ++ measureStyle
+            (id "measure"
+                :: measureStyle
             )
             [ text model.measureText
             , br [] []
@@ -273,36 +273,52 @@ moveTopicToMap :
     -> Point -- newPos        (pos on target map)
     -> Model
     -> Model
-moveTopicToMap topicId mapId origPos targetId targetMapPath pos model =
-    let
-        ( newModel, created ) =
-            createMapIfNeeded targetId model
+moveTopicToMap topicId sourceMapId origPos targetMapId targetMapPath newPos model0 =
+    if targetMapId == sourceMapId then
+        model0
 
-        newPos =
-            case created of
-                True ->
-                    Point
-                        (topicW2 + whiteBoxPadding)
-                        (topicH2 + whiteBoxPadding)
+    else
+        let
+            -- A) make sure the target map exists
+            m0 =
+                CMA.ensureMap targetMapId model0
 
-                False ->
-                    pos
+            -- B) remove/hide from source map
+            m1 =
+                if CMA.isItemInMap sourceMapId topicId m0 then
+                    -- use remove if you have it; else hide
+                    CMA.hideItem sourceMapId topicId m0
 
-        props_ =
-            getTopicProps topicId mapId newModel.maps
-                |> Maybe.andThen (\props -> Just (MapTopic { props | pos = newPos }))
-    in
-    case props_ of
-        Just props ->
-            newModel
-                |> hideItem topicId mapId
-                |> setTopicPos topicId mapId origPos
-                |> addItemToMap topicId props targetId
-                |> select targetId targetMapPath
-                |> autoSize
+                else
+                    m0
 
-        Nothing ->
-            model
+            -- C) reuse or create on target map
+            m2 =
+                if CMA.isItemInMap targetMapId topicId m1 then
+                    m1
+
+                else
+                    let
+                        props : TopicProps
+                        props =
+                            CMA.defaultProps topicId topicSize m1
+
+                        mapProps : MapProps
+                        mapProps =
+                            MapTopic props
+
+                        parentAssocId : MapId
+                        parentAssocId =
+                            -- start simple; adjust if tests later require a specific assoc
+                            targetMapId
+                    in
+                    CMA.addItemToMap targetMapId mapProps parentAssocId m1
+
+            -- D) set position on target map
+            m3 =
+                CMA.setTopicPos targetMapId topicId newPos m2
+        in
+        m3
 
 
 createMapIfNeeded : Id -> Model -> ( Model, Bool )
