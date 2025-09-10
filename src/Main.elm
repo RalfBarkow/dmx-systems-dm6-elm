@@ -4,14 +4,12 @@ import AppModel exposing (..)
 import Boxing exposing (boxContainer, unboxContainer)
 import Browser
 import Browser.Dom as Dom
-import Compat.FedWiki as FW exposing (decodePage, pageToModel)
-import Compat.FedWikiImport as FedWiki
-import Compat.ModelAPI as ModelAPI exposing (addItemToMap)
+import Compat.FedWiki as FW
+import Compat.ModelAPI exposing (addItemToMap)
 import Config exposing (..)
 import Dict
-import Html exposing (Attribute, Html, br, button, div, text, textarea)
-import Html.Attributes as HA exposing (id, style)
-import Html.Events as HE
+import Html exposing (Attribute, Html, br, div, text)
+import Html.Attributes exposing (id, style)
 import IconMenuAPI exposing (updateIconMenu, viewIconMenu)
 import Json.Decode as D
 import Json.Encode as E
@@ -44,7 +42,7 @@ main =
 
 
 trace : String -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
-trace tag (( m, cmd ) as result) =
+trace tag (( _, _ ) as result) =
     let
         _ =
             L.log ("update." ++ tag) ""
@@ -53,7 +51,7 @@ trace tag (( m, cmd ) as result) =
 
 
 traceWith : String -> String -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
-traceWith tag payload (( m, cmd ) as result) =
+traceWith tag payload (( _, _ ) as result) =
     let
         _ =
             L.log
@@ -266,48 +264,37 @@ update msg model =
             ( model, Cmd.none )
 
 
-
--- Derive targetMapId from the path; upstream createMapIfNeeded takes 2 args
-
-
-moveTopicToMap : Id -> MapId -> Point -> Id -> List MapId -> Point -> Model -> Model
-moveTopicToMap topicId containerId origPos targetId targetMapPath newPos model0 =
+moveTopicToMap : Id -> MapId -> Point -> Id -> MapPath -> Point -> Model -> Model
+moveTopicToMap topicId mapId origPos targetId targetMapPath pos model =
     let
-        targetMapId =
-            targetMapPath |> List.reverse |> List.head |> Maybe.withDefault 0
+        ( newModel, created ) =
+            createMapIfNeeded targetId model
 
-        isSelfTarget =
-            targetId == topicId
+        newPos =
+            case created of
+                True ->
+                    Point
+                        (topicW2 + whiteBoxPadding)
+                        (topicH2 + whiteBoxPadding)
 
-        ( model1, created ) =
-            createMapIfNeeded targetId model0
-
-        actualPos =
-            if created then
-                Point (topicW2 + whiteBoxPadding) (topicH2 + whiteBoxPadding)
-
-            else
-                newPos
+                False ->
+                    pos
 
         props_ =
-            getTopicProps topicId containerId model1.maps
-                |> Maybe.map (\p -> MapTopic { p | pos = actualPos })
+            getTopicProps topicId mapId newModel.maps
+                |> Maybe.andThen (\props -> Just (MapTopic { props | pos = newPos }))
     in
-    if isSelfTarget then
-        model0
+    case props_ of
+        Just props ->
+            newModel
+                |> hideItem topicId mapId
+                |> setTopicPos topicId mapId origPos
+                |> addItemToMap topicId props targetId
+                |> select targetId targetMapPath
+                |> autoSize
 
-    else
-        case props_ of
-            Just props ->
-                model1
-                    |> hideItem topicId containerId
-                    |> setTopicPos topicId containerId origPos
-                    |> addItemToMap topicId props targetId
-                    |> select targetId targetMapPath
-                    |> autoSize
-
-            Nothing ->
-                model0
+        Nothing ->
+            model
 
 
 createMapIfNeeded : Id -> Model -> ( Model, Bool )
@@ -537,7 +524,7 @@ fullscreen model =
 back : Model -> Model
 back model =
     let
-        ( mapId, mapPath, selection ) =
+        ( mapId, mapPath, _ ) =
             case model.mapPath of
                 prevMapId :: nextMapId :: mapIds ->
                     ( prevMapId
