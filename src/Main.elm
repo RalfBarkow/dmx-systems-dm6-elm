@@ -4,6 +4,7 @@ import AppModel exposing (..)
 import Boxing exposing (boxContainer, unboxContainer)
 import Browser
 import Browser.Dom as Dom
+import Compat.FedWiki as FW exposing (decodePage, pageToModel)
 import Compat.FedWikiImport as FedWiki
 import Compat.ModelAPI as ModelAPI exposing (addItemToMap)
 import Config exposing (..)
@@ -198,17 +199,17 @@ update msg model =
                 |> traceWith "fedwiki.raw" ("len=" ++ String.fromInt (String.length s))
 
         FedWikiPage raw ->
-            case D.decodeString D.value raw of
-                Ok v ->
-                    let
-                        -- importPage : D.Value -> Model -> ( Model, Cmd msg )
-                        ( m1, cmd ) =
-                            FedWiki.importPage v model
-                    in
-                    ( { m1 | fedWikiRaw = raw }, cmd )
+            let
+                newModel =
+                    case D.decodeString FW.decodePage raw of
+                        Ok page ->
+                            FW.pageToModel page model
 
-                Err _ ->
-                    ( model, Cmd.none )
+                        Err _ ->
+                            model
+            in
+            ( { newModel | fedWikiRaw = raw }, Cmd.none )
+                |> traceWith "fedwiki" ("len=" ++ String.fromInt (String.length raw))
 
         AddTopic ->
             createTopicIn topicDefaultText Nothing [ activeMap model ] model
