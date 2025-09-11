@@ -1,7 +1,6 @@
 module MapRenderer exposing (viewMap)
 
 import AppModel exposing (..)
-import Compat.ModelAPI as ModelAPI exposing (getMapItemById)
 import Config exposing (..)
 import Dict
 import Html exposing (Attribute, Html, div, input, text, textarea)
@@ -16,6 +15,7 @@ import ModelAPI
         , fromPath
         , getMap
         , getMapId
+        , getMapItemById
         , getTopicLabel
         , getTopicPos
         , getTopicSize
