@@ -64,7 +64,7 @@ updateMouse msg ({ present } as undoModel) =
             mouseMove present pos |> swap undoModel
 
         Up ->
-            mouseUp present |> storeModelWith |> swap undoModel
+            mouseUp undoModel
 
         Over class id mapPath ->
             ( mouseOver present class id mapPath, Cmd.none ) |> swap undoModel
@@ -96,71 +96,51 @@ timeArrived : Posix -> UndoModel -> ( UndoModel, Cmd Msg )
 timeArrived time ({ present } as undoModel) =
     case present.mouse.dragState of
         WaitForStartTime class id mapPath pos ->
-            ( updateDragState present <| DragEngaged time class id mapPath pos
-            , Cmd.none
-            )
+            let
+                dragState =
+                    DragEngaged time class id mapPath pos
+            in
+            ( updateDragState present dragState, Cmd.none )
                 |> swap undoModel
 
         WaitForEndTime startTime class id mapPath pos ->
             let
-                newDragState =
-                    enterDrag time startTime class id mapPath pos present
+                delay =
+                    posixToMillis time - posixToMillis startTime > assocDelayMillis
 
-                newModel =
-                    updateDragState present <| newDragState
+                ( dragMode, historyFunc ) =
+                    if delay then
+                        ( DrawAssoc, swap )
+
+                    else
+                        ( DragTopic, push )
+
+                maybeOrigPos =
+                    getTopicPos id (getMapId mapPath) present.maps
+
+                dragState =
+                    case class of
+                        "dmx-topic" ->
+                            case maybeOrigPos of
+                                Just origPos ->
+                                    Drag dragMode id mapPath origPos pos Nothing
+
+                                Nothing ->
+                                    NoDrag
+
+                        -- error is already logged
+                        _ ->
+                            NoDrag
+
+                -- the error will be logged in performDrag
             in
-            case newDragState of
-                Drag DragTopic _ _ _ _ _ ->
-                    push undoModel ( newModel, Cmd.none )
-
-                Drag DrawAssoc _ _ _ _ _ ->
-                    swap undoModel ( newModel, Cmd.none )
-
-                _ ->
-                    logError "timeArrived" "problem with enterDrag" swap undoModel ( newModel, Cmd.none )
+            ( updateDragState present dragState, Cmd.none )
+                |> historyFunc undoModel
 
         _ ->
             logError "timeArrived"
                 "Received \"Time\" message when dragState is not WaitForTime"
-                ( present, Cmd.none )
-                |> swap undoModel
-
-
-enterDrag : Posix -> Posix -> Class -> Id -> MapPath -> Point -> Model -> DragState
-enterDrag time startTime class id mapPath pos model =
-    let
-        delay =
-            posixToMillis time - posixToMillis startTime > assocDelayMillis
-
-        dragMode =
-            if delay then
-                DrawAssoc
-
-            else
-                DragTopic
-
-        mapId =
-            getMapId mapPath
-
-        maybeOrigPos =
-            getTopicPos id mapId model.maps
-    in
-    case class of
-        "dmx-topic" ->
-            case maybeOrigPos of
-                Just origPos ->
-                    Drag dragMode id mapPath origPos pos Nothing
-
-                Nothing ->
-                    NoDrag
-
-        -- error is already logged
-        _ ->
-            NoDrag
-
-
-
--- the error will be logged in performDrag
+                ( undoModel, Cmd.none )
 
 
 mouseMove : Model -> Point -> ( Model, Cmd Msg )
@@ -215,11 +195,11 @@ performDrag model pos =
                 model
 
 
-mouseUp : Model -> ( Model, Cmd Msg )
-mouseUp model =
+mouseUp : UndoModel -> ( UndoModel, Cmd Msg )
+mouseUp ({ present } as undoModel) =
     let
-        ( newModel, cmd ) =
-            case model.mouse.dragState of
+        ( model, cmd, historyFunc ) =
+            case present.mouse.dragState of
                 Drag DragTopic id mapPath origPos _ (Just ( targetId, targetMapPath )) ->
                     let
                         _ =
@@ -251,10 +231,10 @@ mouseUp model =
                             MoveTopicToMap id mapId origPos targetId targetMapPath
                     in
                     if notDroppedOnOwnMap then
-                        ( model, Random.generate msg point )
+                        ( present, Random.generate msg point, swap )
 
                     else
-                        ( model, Cmd.none )
+                        ( present, Cmd.none, swap )
 
                 Drag DrawAssoc id mapPath _ _ (Just ( targetId, targetMapPath )) ->
                     let
@@ -285,31 +265,33 @@ mouseUp model =
                             mapId == getMapId targetMapPath
                     in
                     if isSameMap then
-                        ( createDefaultAssocIn id targetId mapId model, Cmd.none )
+                        ( createDefaultAssocIn id targetId mapId present, Cmd.none, push )
 
                     else
-                        ( model, Cmd.none )
+                        ( present, Cmd.none, swap )
 
                 Drag _ _ _ _ _ _ ->
                     let
                         _ =
                             info "mouseUp" "drag ended w/o target"
                     in
-                    ( model, Cmd.none )
+                    ( present, Cmd.none, swap )
 
                 DragEngaged _ _ _ _ _ ->
                     let
                         _ =
                             info "mouseUp" "drag aborted w/o moving"
                     in
-                    ( model, Cmd.none )
+                    ( present, Cmd.none, swap )
 
                 _ ->
                     logError "mouseUp"
-                        ("Received \"Up\" message when dragState is " ++ toString model.mouse.dragState)
-                        ( model, Cmd.none )
+                        ("Received \"Up\" message when dragState is " ++ toString present.mouse.dragState)
+                        ( present, Cmd.none, swap )
     in
-    ( updateDragState newModel NoDrag, cmd )
+    ( updateDragState model NoDrag, cmd )
+        |> storeModelWith
+        |> historyFunc undoModel
 
 
 point : Random.Generator Point
