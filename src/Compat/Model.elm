@@ -18,8 +18,9 @@ Use these helpers instead of calling constructors / ModelAPI directly.
 
 -}
 
+import AppModel as AM exposing (Model)
 import Compat.ModelAPI as ModelAPI
-import Model exposing (..)
+import Model as M exposing (Delta, Id, MapId, MapItem, MapItems, MapProps, Rectangle)
 
 
 
@@ -27,14 +28,14 @@ import Model exposing (..)
 -- Upstream (Sep 2025): Map id rect items
 
 
-makeMap : MapId -> Rectangle -> MapItems -> Map
+makeMap : MapId -> Rectangle -> MapItems -> M.Map
 makeMap id rect items =
-    Map id rect items
+    M.Map id rect items
 
 
-makeMapR : { a | id : MapId, rect : Rectangle, items : MapItems } -> Map
+makeMapR : { a | id : MapId, rect : Rectangle, items : MapItems } -> M.Map
 makeMapR r =
-    Map r.id r.rect r.items
+    M.Map r.id r.rect r.items
 
 
 
@@ -72,7 +73,7 @@ createAssocAndAddToMap r model =
 
 
 type alias Ext =
-    { journal : List Journal.Entry
+    { journal : List Delta -- or List M.Delta if you prefer to qualify
     , showJournal : Bool
     }
 

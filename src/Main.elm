@@ -5,6 +5,7 @@ import Boxing exposing (boxContainer, unboxContainer)
 import Browser
 import Browser.Dom as Dom
 import Compat.FedWiki as FW
+import Compat.Model as CM
 import Compat.ModelAPI as CMA
 import Config exposing (contentFontSize, mainFont, topicBorderWidth, topicDefaultText, topicDetailMaxWidth, topicDetailPadding, topicLineHeight, topicSize)
 import Dict
@@ -279,40 +280,57 @@ moveTopicToMap topicId sourceMapId origPos targetMapId targetMapPath newPos mode
 
     else
         let
-            -- A) make sure the target map exists
+            -- A) target map must exist before we add
             m0 =
                 CMA.ensureMap targetMapId model0
 
-            -- B) remove/hide from source map
+            -- B) remove (or hide) view from source map
             m1 =
                 if CMA.isItemInMap sourceMapId topicId m0 then
-                    -- use remove if you have it; else hide
+                    -- prefer a true remove if you have it; fall back to hide
+                    -- CMA.removeItemFromMap sourceMapId topicId m0
                     CMA.hideItem sourceMapId topicId m0
 
                 else
                     m0
 
-            -- C) reuse or create on target map
+            intoContainer : Bool
+            intoContainer =
+                -- In DM6 each container's inner map id equals its topic id
+                targetMapId /= 0 && targetMapId /= sourceMapId
+        in
+        -- C) reuse-or-create view on target map
+        let
             m2 =
                 if CMA.isItemInMap targetMapId topicId m1 then
                     m1
 
-                else
+                else if intoContainer then
+                    -- Moving INTO a container: create the owning association and the view
                     let
                         props : TopicProps
                         props =
                             CMA.defaultProps topicId topicSize m1
 
-                        mapProps : MapProps
-                        mapProps =
-                            MapTopic props
+                        -- Adjust these labels to your project’s schema if needed.
+                        assocSpec =
+                            { itemType = "Containment"
+                            , role1 = "Container"
+                            , player1 = targetMapId -- container topic id
+                            , role2 = "Item"
+                            , player2 = topicId
+                            , mapId = targetMapId -- add on the container's inner map
+                            }
 
-                        parentAssocId : MapId
-                        parentAssocId =
-                            -- start simple; adjust if tests later require a specific assoc
-                            targetMapId
+                        ( mA, assocId ) =
+                            CM.createAssocAndAddToMap assocSpec m1
                     in
-                    CMA.addItemToMap targetMapId mapProps parentAssocId m1
+                    mA
+
+                else
+                    -- Moving OUT to parent/root: add safely without a new owning assoc
+                    -- (root has no owning container)
+                    CMA.addItemToMapDefault targetMapId topicId m1
 
             -- D) set position on target map
             m3 =
