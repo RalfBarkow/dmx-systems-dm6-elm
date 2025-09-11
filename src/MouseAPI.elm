@@ -2,6 +2,7 @@ module MouseAPI exposing (mouseHoverHandler, mouseSubs, updateMouse)
 
 import AppModel exposing (Model, Msg(..))
 import Browser.Events as Events
+import Compat.ContainmentOps as Contain
 import Config exposing (assocDelayMillis, topicH2, topicW2, whiteBoxPadding, whiteBoxRange)
 import Debug
 import Html exposing (Attribute)
@@ -200,41 +201,24 @@ mouseUp model =
     let
         ( newModel, cmd ) =
             case model.mouse.dragState of
-                Drag DragTopic id mapPath origPos _ (Just ( targetId, targetMapPath )) ->
+                Drag DragTopic id fromPath origPos dropPos (Just (_targetId, toPath)) ->
                     let
                         _ =
                             L.log "mouseUp"
                                 ("dropped "
                                     ++ fromInt id
-                                    ++ " (map "
-                                    ++ fromPath mapPath
-                                    ++ ") on "
-                                    ++ fromInt targetId
-                                    ++ " (map "
-                                    ++ fromPath targetMapPath
-                                    ++ ") --> "
-                                    ++ (if notDroppedOnOwnMap then
-                                            "move topic"
-
-                                        else
-                                            "abort"
-                                       )
+                                    ++ " (map " ++ fromPath fromPath ++ ") "
+                                    ++ "on map " ++ fromPath toPath
                                 )
-
-                        mapId =
-                            getMapId mapPath
-
-                        notDroppedOnOwnMap =
-                            mapId /= targetId
-
-                        msg =
-                            MoveTopicToMap id mapId origPos targetId targetMapPath
                     in
-                    if notDroppedOnOwnMap then
-                        ( model, Random.generate msg point )
-
-                    else
-                        ( model, Cmd.none )
+                    Contain.recontainToDepth model
+                        { id = id
+                        , fromPath = fromPath
+                        , toPath = toPath
+                        , origPos = origPos
+                        , dropPos = dropPos
+                        }
+                    
 
                 Drag DrawAssoc id mapPath _ _ (Just ( targetId, targetMapPath )) ->
                     let
