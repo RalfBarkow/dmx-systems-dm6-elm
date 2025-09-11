@@ -1,5 +1,3 @@
-mkdir -p scripts
-cat > scripts/integrate-upstream.sh <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -133,5 +131,3 @@ say "Push ${MAIN_BRANCH} to origin"
 git push origin "${MAIN_BRANCH}"
 
 ok "Done. ${UPSTREAM_REMOTE}/master → ${MASTER_BRANCH} → ${MAIN_BRANCH}"
-EOF
-chmod +x scripts/integrate-upstream.sh
