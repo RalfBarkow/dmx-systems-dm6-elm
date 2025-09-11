@@ -1,6 +1,7 @@
 module AppMain exposing
     ( Model
     , Msg
+    , UndoModel
     , init
     , main
     , subscriptions
@@ -8,47 +9,53 @@ module AppMain exposing
     , view
     )
 
+import AppModel as AM exposing (Model, Msg, UndoModel)
 import Browser exposing (Document)
-import Html exposing (Html)
+import Json.Encode as E
 import Main
+import MouseAPI exposing (mouseSubs)
 
 
 
--- Re-export core types
+-- Re-exposed types via local aliases (required to expose from this module)
 
 
 type alias Model =
-    Main.Model
+    AM.Model
+
+
+type alias UndoModel =
+    AM.UndoModel
 
 
 type alias Msg =
-    Main.Msg
+    AM.Msg
 
 
 
--- Re-export core functions
+-- Wire up program parts
 
 
-init : () -> ( Model, Cmd Msg )
+init : E.Value -> ( UndoModel, Cmd Msg )
 init =
     Main.init
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+update : Msg -> UndoModel -> ( UndoModel, Cmd Msg )
 update =
     Main.update
 
 
-subscriptions : Model -> Sub Msg
-subscriptions =
-    Main.subscriptions
-
-
-view : Model -> Document Msg
+view : UndoModel -> Document Msg
 view =
     Main.view
 
 
-main : Program () Model Msg
+subscriptions : UndoModel -> Sub Msg
+subscriptions =
+    mouseSubs
+
+
+main : Program E.Value UndoModel Msg
 main =
     Main.main
