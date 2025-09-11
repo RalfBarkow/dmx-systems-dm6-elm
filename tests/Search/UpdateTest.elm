@@ -1,6 +1,7 @@
 module Search.UpdateTest exposing (tests)
 
 import Compat.TestDefault exposing (defaultModel)
+import Compat.TestUtil exposing (asUndo, present)
 import Expect
 import Search exposing (SearchMsg(..))
 import SearchAPI exposing (updateSearch)
@@ -14,15 +15,15 @@ tests =
             \_ ->
                 let
                     ( m2, _ ) =
-                        updateSearch (Input "foo") defaultModel
+                        updateSearch (Input "foo") (asUndo defaultModel)
                 in
-                Expect.equal m2.search.text "foo"
+                Expect.equal (present m2).search.text "foo"
         , test "SearchFocus opens the result menu (differs from default)" <|
             \_ ->
                 let
                     ( m2, _ ) =
-                        updateSearch Search.FocusInput defaultModel
+                        updateSearch Search.FocusInput (asUndo defaultModel)
                 in
                 -- Compare the whole search submodel (robust to internal field renames)
-                Expect.notEqual m2.search defaultModel.search
+                Expect.notEqual (present m2).search defaultModel.search
         ]
