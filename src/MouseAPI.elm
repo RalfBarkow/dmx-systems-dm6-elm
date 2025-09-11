@@ -17,8 +17,6 @@ import ModelAPI
         , fromPath
         , getMapId
         , getTopicPos
-        , idDecoder
-        , pathDecoder
         , push
         , resetSelection
         , select
@@ -32,7 +30,16 @@ import Storage exposing (storeModelWith)
 import String exposing (fromInt)
 import Task
 import Time exposing (Posix, posixToMillis)
-import Utils exposing (info, logError, toString)
+import Utils
+    exposing
+        ( classDecoder
+        , idDecoder
+        , info
+        , logError
+        , pathDecoder
+        , pointDecoder
+        , toString
+        )
 
 
 
@@ -56,7 +63,7 @@ updateMouse msg ({ present } as undoModel) =
         Down ->
             ( mouseDown present, Cmd.none ) |> swap undoModel
 
-        DownItem class id mapPath pos ->
+        DownOnItem class id mapPath pos ->
             mouseDownOnItem present class id mapPath pos
                 |> swap undoModel
 
@@ -387,20 +394,7 @@ mouseDownSub : Sub Msg
 mouseDownSub =
     Events.onMouseDown <|
         D.oneOf
-            [ D.map Mouse <|
-                D.map4 DownItem
-                    (D.oneOf
-                        [ D.at [ "target", "className" ] D.string -- HTML elements
-                        , D.at [ "target", "className", "baseVal" ] D.string -- SVG elements
-                        ]
-                    )
-                    (D.at [ "target", "dataset", "id" ] D.string |> D.andThen idDecoder)
-                    (D.at [ "target", "dataset", "path" ] D.string |> D.andThen pathDecoder)
-                    (D.map2 Point
-                        -- TODO: no code doubling
-                        (D.field "clientX" D.float)
-                        (D.field "clientY" D.float)
-                    )
+            [ D.map Mouse <| D.map4 DownOnItem classDecoder idDecoder pathDecoder pointDecoder
             , D.succeed (Mouse Down)
             ]
 
@@ -408,30 +402,11 @@ mouseDownSub =
 dragSub : Sub Msg
 dragSub =
     Sub.batch
-        [ Events.onMouseMove <|
-            D.map Mouse <|
-                D.map Move
-                    (D.map2 Point
-                        -- TODO: no code doubling
-                        (D.field "clientX" D.float)
-                        (D.field "clientY" D.float)
-                    )
+        [ Events.onMouseMove <| D.map Mouse <| D.map Move pointDecoder
         , Events.onMouseUp <| D.map Mouse <| D.succeed Up
         ]
 
 
-
--- TODO: no code doubling
-
-
 mouseDecoder : (Class -> Id -> MapPath -> MouseMsg) -> D.Decoder Msg
 mouseDecoder msg =
-    D.map Mouse <|
-        D.map3 msg
-            (D.oneOf
-                [ D.at [ "target", "className" ] D.string -- HTML elements
-                , D.at [ "target", "className", "baseVal" ] D.string -- SVG elements
-                ]
-            )
-            (D.at [ "target", "dataset", "id" ] D.string |> D.andThen idDecoder)
-            (D.at [ "target", "dataset", "path" ] D.string |> D.andThen pathDecoder)
+    D.map Mouse <| D.map3 msg classDecoder idDecoder pathDecoder
