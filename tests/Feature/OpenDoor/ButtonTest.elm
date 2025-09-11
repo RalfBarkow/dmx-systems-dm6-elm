@@ -1,6 +1,7 @@
 module Feature.OpenDoor.ButtonTest exposing (tests)
 
 import AppModel as AM exposing (Msg(..), default)
+import Compat.TestUtil exposing (asUndo)
 import Dict
 import Expect
 import Html
@@ -77,7 +78,7 @@ tests =
 
                     -- Render document body
                     root =
-                        Html.div [] (view model0).body
+                        Html.div [] (view (asUndo model0)).body
                             |> Query.fromHtml
 
                     openDoorBtn =

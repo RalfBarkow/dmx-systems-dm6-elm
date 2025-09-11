@@ -1,5 +1,6 @@
 module Compat.TestDefault exposing
-    ( defaultModel
+    ( asUndo
+    , defaultModel
     , defaultUndo
     )
 
@@ -8,13 +9,9 @@ import Json.Encode as E
 import Main
 
 
-
--- What Main.init actually returns now (UndoModel)
-
-
-defaultUndo : AM.UndoModel
-defaultUndo =
-    Tuple.first (Main.init E.null)
+asUndo : AM.Model -> AM.UndoModel
+asUndo m =
+    { past = [], present = m, future = [] }
 
 
 
@@ -24,3 +21,12 @@ defaultUndo =
 defaultModel : AM.Model
 defaultModel =
     defaultUndo.present
+
+
+
+-- What Main.init actually returns now (UndoModel)
+
+
+defaultUndo : AM.UndoModel
+defaultUndo =
+    Tuple.first (Main.init E.null)
