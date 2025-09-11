@@ -26,6 +26,8 @@
     "format": "npx elm-format --yes src tests review",
     "format:check": "npx elm-format --validate src tests review",
     "test": "elm-test",
+    "test:master": "elm-test tests/Tests/Master.elm",
+    "test:main":   "elm-test tests/Tests/Main.elm",
     "test:ci": "elm-format --validate src && elm-review && elm-test",
     "review": "elm-review",
     "clean": "rm -f main.js main.min.js dm6-elm.html"

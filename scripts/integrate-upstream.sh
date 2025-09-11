@@ -55,6 +55,8 @@ ensure_remote() {
 }
 
 run_elm_pipeline() {
+  local suite="${1:-master}"  # master | main
+
   if [[ $NO_FORMAT -eq 0 ]]; then
     say "elm-format"
     npx elm-format src tests --yes
@@ -66,12 +68,13 @@ run_elm_pipeline() {
   npx elm make src/AppMain.elm --output=/dev/null
 
   if [[ $NO_TEST -eq 0 ]]; then
-    say "elm-test"
-    npx elm-test
+    say "elm-test (${suite} entrypoint)"
+    npm run "test:${suite}"
   else
     warn "Skipping elm-test (--no-test)"
   fi
 }
+
 
 say "Pre-flight checks"
 need git
@@ -96,7 +99,7 @@ else
 fi
 
 say "Run Elm pipeline on ${MASTER_BRANCH}"
-run_elm_pipeline
+run_elm_pipeline master
 
 say "Push ${MASTER_BRANCH} to origin"
 git push origin "${MASTER_BRANCH}"
@@ -125,7 +128,7 @@ else
 fi
 
 say "Run Elm pipeline on ${MAIN_BRANCH}"
-run_elm_pipeline
+run_elm_pipeline main
 
 say "Push ${MAIN_BRANCH} to origin"
 git push origin "${MAIN_BRANCH}"
