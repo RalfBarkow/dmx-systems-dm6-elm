@@ -23,10 +23,10 @@ import ModelAPI
         , setTopicPosByDelta
         , swap
         )
-import Mouse exposing (DragMode(..), DragState(..), MouseMsg(..))
+import Mouse exposing (DragMode(..), DragState(..))
 import Random
 import SearchAPI exposing (closeResultMenu)
-import Storage exposing (storeModelWith)
+import Storage exposing (storeWith)
 import String exposing (fromInt)
 import Task
 import Time exposing (Posix, posixToMillis)
@@ -48,8 +48,8 @@ import Utils
 
 mouseHoverHandler : List (Attribute Msg)
 mouseHoverHandler =
-    [ on "mouseover" (mouseDecoder Over)
-    , on "mouseout" (mouseDecoder Out)
+    [ on "mouseover" (mouseDecoder Mouse.Over)
+    , on "mouseout" (mouseDecoder Mouse.Out)
     ]
 
 
@@ -57,29 +57,31 @@ mouseHoverHandler =
 -- UPDATE
 
 
-updateMouse : MouseMsg -> UndoModel -> ( UndoModel, Cmd Msg )
+updateMouse : Mouse.Msg -> UndoModel -> ( UndoModel, Cmd Msg )
 updateMouse msg ({ present } as undoModel) =
     case msg of
-        Down ->
+        Mouse.Down ->
             ( mouseDown present, Cmd.none ) |> swap undoModel
 
-        DownOnItem class id mapPath pos ->
+        Mouse.DownOnItem class id mapPath pos ->
             mouseDownOnItem present class id mapPath pos
                 |> swap undoModel
 
-        Move pos ->
+        Mouse.Move pos ->
             mouseMove present pos |> swap undoModel
 
-        Up ->
+        Mouse.Up ->
             mouseUp undoModel
 
-        Over class id mapPath ->
-            ( mouseOver present class id mapPath, Cmd.none ) |> swap undoModel
+        Mouse.Over class id mapPath ->
+            ( mouseOver present class id mapPath, Cmd.none )
+                |> swap undoModel
 
-        Out class id mapPath ->
-            ( mouseOut present class id mapPath, Cmd.none ) |> swap undoModel
+        Mouse.Out class id mapPath ->
+            ( mouseOut present class id mapPath, Cmd.none )
+                |> swap undoModel
 
-        Time time ->
+        Mouse.Time time ->
             timeArrived time undoModel
 
 
@@ -95,7 +97,7 @@ mouseDownOnItem : Model -> Class -> Id -> MapPath -> Point -> ( Model, Cmd Msg )
 mouseDownOnItem model class id mapPath pos =
     ( updateDragState model (WaitForStartTime class id mapPath pos)
         |> select id mapPath
-    , Task.perform (Mouse << Time) Time.now
+    , Task.perform (Mouse << Mouse.Time) Time.now
     )
 
 
@@ -155,7 +157,7 @@ mouseMove model pos =
     case model.mouse.dragState of
         DragEngaged time class id mapPath pos_ ->
             ( updateDragState model <| WaitForEndTime time class id mapPath pos_
-            , Task.perform (Mouse << Time) Time.now
+            , Task.perform (Mouse << Mouse.Time) Time.now
             )
 
         WaitForEndTime _ _ _ _ _ ->
@@ -297,7 +299,7 @@ mouseUp ({ present } as undoModel) =
                         ( present, Cmd.none, swap )
     in
     ( updateDragState model NoDrag, cmd )
-        |> storeModelWith
+        |> storeWith
         |> historyFunc undoModel
 
 
@@ -323,7 +325,7 @@ point =
 
 
 mouseOver : Model -> Class -> Id -> MapPath -> Model
-mouseOver model class targetId targetMapPath =
+mouseOver model _ targetId targetMapPath =
     case model.mouse.dragState of
         Drag dragMode id mapPath origPos lastPos _ ->
             let
@@ -352,7 +354,7 @@ mouseOver model class targetId targetMapPath =
 
 
 mouseOut : Model -> Class -> Id -> MapPath -> Model
-mouseOut model class targetId targetMapPath =
+mouseOut model _ _ _ =
     case model.mouse.dragState of
         Drag dragMode id mapPath origPos lastPos _ ->
             -- reset target
@@ -394,19 +396,19 @@ mouseDownSub : Sub Msg
 mouseDownSub =
     Events.onMouseDown <|
         D.oneOf
-            [ D.map Mouse <| D.map4 DownOnItem classDecoder idDecoder pathDecoder pointDecoder
-            , D.succeed (Mouse Down)
+            [ D.map Mouse <| D.map4 Mouse.DownOnItem classDecoder idDecoder pathDecoder pointDecoder
+            , D.succeed (Mouse Mouse.Down)
             ]
 
 
 dragSub : Sub Msg
 dragSub =
     Sub.batch
-        [ Events.onMouseMove <| D.map Mouse <| D.map Move pointDecoder
-        , Events.onMouseUp <| D.map Mouse <| D.succeed Up
+        [ Events.onMouseMove <| D.map Mouse <| D.map Mouse.Move pointDecoder
+        , Events.onMouseUp <| D.map Mouse <| D.succeed Mouse.Up
         ]
 
 
-mouseDecoder : (Class -> Id -> MapPath -> MouseMsg) -> D.Decoder Msg
+mouseDecoder : (Class -> Id -> MapPath -> Mouse.Msg) -> D.Decoder Msg
 mouseDecoder msg =
     D.map Mouse <| D.map3 msg classDecoder idDecoder pathDecoder

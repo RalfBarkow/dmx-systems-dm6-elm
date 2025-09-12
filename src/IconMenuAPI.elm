@@ -9,10 +9,10 @@ import FeatherIcons as Icon
 import Html exposing (Attribute, Html, button, div, text)
 import Html.Attributes exposing (style, title)
 import Html.Events exposing (onClick)
-import IconMenu exposing (IconMenuMsg(..))
+import IconMenu
 import Model exposing (..)
 import ModelAPI exposing (..)
-import Storage exposing (storeModel)
+import Storage exposing (store)
 import String exposing (fromFloat)
 import Utils exposing (..)
 
@@ -30,9 +30,7 @@ viewIconMenu model =
                 iconListStyle
                 viewIconList
             , button
-                ([ onClick (IconMenu Close) ]
-                    ++ closeButtonStyle
-                )
+                (onClick (IconMenu IconMenu.Close) :: closeButtonStyle)
                 [ Icon.x
                     |> Icon.withSize 12
                     |> Icon.toHtml []
@@ -78,7 +76,7 @@ viewIconList =
         |> List.map
             (\( iconName, icon ) ->
                 button
-                    ([ onClick (Just iconName |> SetIcon |> IconMenu)
+                    ([ onClick (Just iconName |> IconMenu.SetIcon |> IconMenu)
                      , stopPropagationOnMousedown NoOp
                      , title iconName
                      ]
@@ -138,19 +136,19 @@ topicIconStyle =
 -- UPDATE
 
 
-updateIconMenu : IconMenuMsg -> UndoModel -> ( UndoModel, Cmd Msg )
+updateIconMenu : IconMenu.Msg -> UndoModel -> ( UndoModel, Cmd Msg )
 updateIconMenu msg ({ present } as undoModel) =
     case msg of
-        Open ->
+        IconMenu.Open ->
             ( openIconMenu present, Cmd.none ) |> swap undoModel
 
-        Close ->
+        IconMenu.Close ->
             ( closeIconMenu present, Cmd.none ) |> swap undoModel
 
-        SetIcon maybeIcon ->
+        IconMenu.SetIcon maybeIcon ->
             setIcon maybeIcon present
                 |> closeIconMenu
-                |> storeModel
+                |> store
                 |> push undoModel
 
 

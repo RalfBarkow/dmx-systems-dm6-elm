@@ -139,7 +139,7 @@ storeMapGeometry mapPath newRect oldRect model =
 
 storeMapRect : MapId -> Rectangle -> Model -> Model
 storeMapRect mapId newRect model =
-    model |> updateMapRect mapId (\rect -> newRect)
+    model |> updateMapRect mapId (\_ -> newRect)
 
 
 adjustMapPos : MapId -> MapId -> Rectangle -> Rectangle -> Model -> Model

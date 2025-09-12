@@ -9,7 +9,7 @@ module AppMain exposing
     , view
     )
 
-import AppModel as AM exposing (Model, Msg, UndoModel)
+import AppModel as AM exposing (Msg, UndoModel)
 import Browser exposing (Document)
 import Json.Encode as E
 import Main

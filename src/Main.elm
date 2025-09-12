@@ -1,4 +1,4 @@
-port module Main exposing (..)
+module Main exposing (..)
 
 -- components
 
@@ -19,22 +19,12 @@ import Model exposing (..)
 import ModelAPI exposing (..)
 import MouseAPI exposing (mouseHoverHandler, mouseSubs, updateMouse)
 import SearchAPI exposing (updateSearch, viewResultMenu)
-import Storage exposing (modelDecoder, storeModel, storeModelWith)
+import Storage exposing (exportJSON, importJSON, modelDecoder, store, storeWith)
 import String exposing (fromFloat, fromInt)
 import Task
 import Toolbar exposing (viewToolbar)
 import UndoList
 import Utils exposing (..)
-
-
-
--- PORTS
-
-
-port importJSON : () -> Cmd msg
-
-
-port exportJSON : () -> Cmd msg
 
 
 
@@ -103,9 +93,7 @@ view ({ present } as undoModel) =
                 ++ viewIconMenu present
             )
         , div
-            ([ id "measure" ]
-                ++ measureStyle
-            )
+            (id "measure" :: measureStyle)
             [ text present.measureText
             , br [] []
             ]
@@ -156,17 +144,17 @@ update msg ({ present } as undoModel) =
     case msg of
         AddTopic ->
             createTopicIn topicDefaultText Nothing [ activeMap present ] present
-                |> storeModel
+                |> store
                 |> push undoModel
 
         MoveTopicToMap topicId mapId origPos targetId targetMapPath pos ->
             moveTopicToMap topicId mapId origPos targetId targetMapPath pos present
-                |> storeModel
+                |> store
                 |> push undoModel
 
         SwitchDisplay displayMode ->
             switchDisplay displayMode present
-                |> storeModel
+                |> store
                 |> swap undoModel
 
         Search searchMsg ->
@@ -182,13 +170,13 @@ update msg ({ present } as undoModel) =
             updateMouse mouseMsg undoModel
 
         Nav navMsg ->
-            updateNav navMsg present |> storeModel |> reset
+            updateNav navMsg present |> store |> reset
 
         Hide ->
-            hide present |> storeModel |> push undoModel
+            hide present |> store |> push undoModel
 
         Delete ->
-            delete present |> storeModel |> push undoModel
+            delete present |> store |> push undoModel
 
         Undo ->
             undo undoModel
@@ -213,14 +201,13 @@ moveTopicToMap topicId mapId origPos targetId targetMapPath pos model =
             createMapIfNeeded targetId model
 
         newPos =
-            case created of
-                True ->
-                    Point
-                        (topicW2 + whiteBoxPadding)
-                        (topicH2 + whiteBoxPadding)
+            if created then
+                Point
+                    (topicW2 + whiteBoxPadding)
+                    (topicH2 + whiteBoxPadding)
 
-                False ->
-                    pos
+            else
+                pos
 
         props_ =
             getTopicProps topicId mapId newModel.maps
@@ -260,12 +247,11 @@ setDisplayModeInAllMaps topicId displayMode model =
     model.maps
         |> Dict.foldr
             (\mapId _ modelAcc ->
-                case isItemInMap topicId mapId model of
-                    True ->
-                        setDisplayMode topicId mapId displayMode modelAcc
+                if isItemInMap topicId mapId model then
+                    setDisplayMode topicId mapId displayMode modelAcc
 
-                    False ->
-                        modelAcc
+                else
+                    modelAcc
             )
             model
 
@@ -312,10 +298,10 @@ updateEdit msg ({ present } as undoModel) =
             startEdit present |> push undoModel
 
         OnTextInput text ->
-            onTextInput text present |> storeModel |> swap undoModel
+            onTextInput text present |> store |> swap undoModel
 
         OnTextareaInput text ->
-            onTextareaInput text present |> storeModelWith |> swap undoModel
+            onTextareaInput text present |> storeWith |> swap undoModel
 
         SetTopicSize topicId mapId size ->
             ( present
@@ -466,7 +452,7 @@ fullscreen model =
 back : Model -> Model
 back model =
     let
-        ( mapId, mapPath, selection ) =
+        ( mapId, mapPath, _ ) =
             case model.mapPath of
                 prevMapId :: nextMapId :: mapIds ->
                     ( prevMapId
@@ -544,7 +530,7 @@ undo undoModel =
             resetTransientState newUndoModel.present
     in
     newModel
-        |> storeModel
+        |> store
         |> swap newUndoModel
 
 
@@ -558,5 +544,5 @@ redo undoModel =
             resetTransientState newUndoModel.present
     in
     newModel
-        |> storeModel
+        |> store
         |> swap newUndoModel

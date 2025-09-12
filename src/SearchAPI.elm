@@ -11,8 +11,8 @@ import Html.Events exposing (on, onFocus, onInput)
 import Json.Decode as D
 import Model exposing (Id, ItemInfo(..), MapId, MapProps(..))
 import ModelAPI exposing (..)
-import Search exposing (ResultMenu(..), SearchMsg(..))
-import Storage exposing (storeModel)
+import Search exposing (ResultMenu(..))
+import Storage exposing (store)
 import String exposing (fromInt)
 import Utils exposing (idDecoder, info, logError, stopPropagationOnMousedown)
 
@@ -30,8 +30,8 @@ viewSearchInput model =
             [ text "Search" ]
         , input
             ([ value model.search.text
-             , onInput (Search << Input)
-             , onFocus (Search FocusInput)
+             , onInput (Search << Search.Input)
+             , onFocus (Search Search.FocusInput)
              ]
                 ++ searchInputStyle
             )
@@ -49,9 +49,9 @@ viewResultMenu model =
     case ( model.search.menu, model.search.result |> List.isEmpty ) of
         ( Open _, False ) ->
             [ div
-                ([ on "click" (itemDecoder ClickItem)
-                 , on "mouseover" (itemDecoder HoverItem)
-                 , on "mouseout" (itemDecoder UnhoverItem)
+                ([ on "click" (itemDecoder Search.ClickItem)
+                 , on "mouseover" (itemDecoder Search.HoverItem)
+                 , on "mouseout" (itemDecoder Search.UnhoverItem)
                  , stopPropagationOnMousedown NoOp
                  ]
                     ++ resultMenuStyle
@@ -62,8 +62,8 @@ viewResultMenu model =
                             case getTopicInfo id model of
                                 Just topic ->
                                     div
-                                        ([ attribute "data-id" (fromInt id) ]
-                                            ++ resultItemStyle id model
+                                        (attribute "data-id" (fromInt id)
+                                            :: resultItemStyle id model
                                         )
                                         [ text topic.text ]
 
@@ -77,7 +77,7 @@ viewResultMenu model =
             []
 
 
-itemDecoder : (Id -> SearchMsg) -> D.Decoder Msg
+itemDecoder : (Id -> Search.Msg) -> D.Decoder Msg
 itemDecoder msg =
     D.map Search <| D.map msg idDecoder
 
@@ -132,26 +132,26 @@ resultItemStyle topicId model =
 -- UPDATE
 
 
-updateSearch : SearchMsg -> UndoModel -> ( UndoModel, Cmd Msg )
+updateSearch : Search.Msg -> UndoModel -> ( UndoModel, Cmd Msg )
 updateSearch msg ({ present } as undoModel) =
     case msg of
-        Input text ->
+        Search.Input text ->
             ( onTextInput text present, Cmd.none ) |> swap undoModel
 
-        FocusInput ->
+        Search.FocusInput ->
             ( onFocusInput present, Cmd.none ) |> swap undoModel
 
-        HoverItem topicId ->
+        Search.HoverItem topicId ->
             ( onHoverItem topicId present, Cmd.none ) |> swap undoModel
 
-        UnhoverItem _ ->
+        Search.UnhoverItem _ ->
             ( onUnhoverItem present, Cmd.none ) |> swap undoModel
 
-        ClickItem topicId ->
+        Search.ClickItem topicId ->
             present
                 |> revealTopic topicId (activeMap present)
                 |> closeResultMenu
-                |> storeModel
+                |> store
                 |> push undoModel
 
 

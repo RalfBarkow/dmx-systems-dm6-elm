@@ -3,16 +3,16 @@ module IconMenu exposing (..)
 import Model exposing (IconName)
 
 
-type alias IconMenuModel =
+type alias Model =
     { open : Bool }
 
 
-init : IconMenuModel
+init : Model
 init =
     { open = False }
 
 
-type IconMenuMsg
+type Msg
     = Open
     | Close
     | SetIcon (Maybe IconName)
