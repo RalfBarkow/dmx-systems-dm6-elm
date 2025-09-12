@@ -7,11 +7,30 @@ module Compat.ContainmentOps exposing
     )
 
 import Algebra.Containment as C
-import Model exposing (..)
-import ModelAPI exposing (..)
+import AppModel as AM
+import Model exposing (Id, MapPath, Point)
+import ModelAPI
+    exposing
+        ( createDefaultAssocIn
+        , fromPath
+        , getMapId
+        , getTopicPos
+        , push
+        , resetSelection
+        , select
+        , setTopicPosByDelta
+        , swap
+        )
+import Random
+import UndoList
 
 
-depthOf : Model -> Id -> C.Depth
+boundaryCross : AM.UndoModel -> ( AM.Model, Cmd AM.Msg ) -> ( AM.UndoModel, Cmd AM.Msg )
+boundaryCross =
+    push
+
+
+depthOf : AM.Model -> Id -> C.Depth
 depthOf model id =
     let
         path =
@@ -22,7 +41,7 @@ depthOf model id =
     C.toDepth path
 
 
-moveDeeperBy : Model -> Id -> Int -> Model
+moveDeeperBy : AM.Model -> Id -> Int -> AM.Model
 moveDeeperBy model id k =
     let
         d0 =
@@ -31,30 +50,32 @@ moveDeeperBy model id k =
         d1 =
             C.within d0 (C.Depth k)
     in
-    recontainToDepth model id d1
+    Tuple.first <|
+        recontainToDepth model
+            { id = id
+            , fromPath = mapPathOf model id
+            , toPath = fromDepthToMapPath d1
+            , origPos = getTopicPos id model
+            , dropPos = getTopicPos id model
+            }
 
 
 
 -- implement using ensureMap + addItemToMap
 
 
-moveShallowerBy : Model -> Id -> Int -> Model
+moveShallowerBy : AM.Model -> Id -> Int -> AM.Model
 moveShallowerBy model id k =
     moveDeeperBy model id -k
 
 
-multiplyDepth : Model -> Id -> Int -> Model
+multiplyDepth : AM.Model -> Id -> Int -> AM.Model
 multiplyDepth model id k =
     let
         d1 =
             C.times (depthOf model id) (C.Depth k)
     in
     recontainToDepth model id d1
-
-
-boundaryCross : UndoModel -> ( Model, Cmd msg ) -> ( UndoModel, Cmd msg )
-boundaryCross =
-    push
 
 
 {-| Commit a drop by (possibly) crossing a boundary.
@@ -74,7 +95,7 @@ apply it” decoupled.
 
 -}
 recontainToDepth :
-    Model
+    AM.Model
     ->
         { id : Id
         , fromPath : MapPath
@@ -82,7 +103,7 @@ recontainToDepth :
         , origPos : Point
         , dropPos : Point
         }
-    -> ( Model, Cmd AM.Msg )
+    -> ( AM.Model, Cmd AM.Msg )
 recontainToDepth model { id, fromPath, toPath, origPos, dropPos } =
     let
         srcMapId =
@@ -103,3 +124,20 @@ recontainToDepth model { id, fromPath, toPath, origPos, dropPos } =
                 AM.MoveTopicToMap id srcMapId origPos id toPath p
         in
         ( model, Random.generate mk (Random.constant dropPos) )
+
+
+{-| TEMP: resolve an item's map path.
+TODO: replace with a real lookup once available upstream/compat.
+-}
+mapPathOf : AM.Model -> Id -> MapPath
+mapPathOf model _ =
+    model.mapPath
+
+
+{-| Converts a C.Depth to a MapPath.
+Replace this stub with the actual conversion logic as needed.
+-}
+fromDepthToMapPath : C.Depth -> MapPath
+fromDepthToMapPath depth =
+    -- Implement the conversion logic here
+    []

@@ -1,26 +1,43 @@
 module MouseAPI exposing (mouseHoverHandler, mouseSubs, updateMouse)
 
-import AppModel exposing (Model, Msg(..))
+import AppModel exposing (Model, Msg(..), UndoModel)
 import Browser.Events as Events
-import Compat.ContainmentOps as Contain
 import Config exposing (assocDelayMillis, topicH2, topicW2, whiteBoxPadding, whiteBoxRange)
-import Debug
 import Html exposing (Attribute)
 import Html.Events exposing (on)
 import IconMenuAPI exposing (closeIconMenu)
 import Json.Decode as D
-import Logger as L
 import MapAutoSize exposing (autoSize)
 import Model exposing (Class, Id, MapPath, Point)
-import ModelAPI exposing (createDefaultAssocIn, fromPath, getMapId, getTopicPos, idDecoder, pathDecoder, select, setTopicPosByDelta)
+import ModelAPI
+    exposing
+        ( createDefaultAssocIn
+        , fromPath
+        , getMapId
+        , getTopicPos
+        , push
+        , resetSelection
+        , select
+        , setTopicPosByDelta
+        , swap
+        )
 import Mouse exposing (DragMode(..), DragState(..), MouseMsg(..))
 import Random
 import SearchAPI exposing (closeResultMenu)
 import Storage exposing (storeModelWith)
 import String exposing (fromInt)
 import Task
-import Time exposing (posixToMillis)
-import Utils as U exposing (info)
+import Time exposing (Posix, posixToMillis)
+import Utils
+    exposing
+        ( classDecoder
+        , idDecoder
+        , info
+        , logError
+        , pathDecoder
+        , pointDecoder
+        , toString
+        )
 
 
 
@@ -38,114 +55,101 @@ mouseHoverHandler =
 -- UPDATE
 
 
-updateMouse : MouseMsg -> Model -> ( Model, Cmd Msg )
-updateMouse msg model =
-    let
-        _ =
-            L.log "MouseMsg" msg
-    in
+updateMouse : MouseMsg -> UndoModel -> ( UndoModel, Cmd Msg )
+updateMouse msg ({ present } as undoModel) =
     case msg of
         Down ->
-            ( mouseDown model, Cmd.none )
+            ( mouseDown present, Cmd.none ) |> swap undoModel
 
-        DownItem class id mapPath pos ->
-            mouseDownOnItem model class id mapPath pos
+        DownOnItem class id mapPath pos ->
+            mouseDownOnItem present class id mapPath pos
+                |> swap undoModel
 
         Move pos ->
-            mouseMove model pos
+            mouseMove present pos |> swap undoModel
 
         Up ->
-            mouseUp model |> storeModelWith
+            mouseUp undoModel
 
         Over class id mapPath ->
-            ( mouseOver model class id mapPath, Cmd.none )
+            ( mouseOver present class id mapPath, Cmd.none ) |> swap undoModel
 
         Out class id mapPath ->
-            ( mouseOut model class id mapPath, Cmd.none )
+            ( mouseOut present class id mapPath, Cmd.none ) |> swap undoModel
 
         Time time ->
-            ( timeArrived time model, Cmd.none )
+            timeArrived time undoModel
 
 
 mouseDown : Model -> Model
 mouseDown model =
-    { model | selection = [] }
+    model
+        |> resetSelection
         |> closeIconMenu
         |> closeResultMenu
 
 
 mouseDownOnItem : Model -> Class -> Id -> MapPath -> Point -> ( Model, Cmd Msg )
-mouseDownOnItem model cls id mapPath pos =
-    let
-        _ =
-            L.log "DownItem"
-                { cls = cls, id = id, mapPath = mapPath, pos = pos }
-    in
-    ( updateDragState model (WaitForStartTime cls id mapPath pos)
+mouseDownOnItem model class id mapPath pos =
+    ( updateDragState model (WaitForStartTime class id mapPath pos)
         |> select id mapPath
     , Task.perform (Mouse << Time) Time.now
     )
 
 
-timeArrived : Time.Posix -> Model -> Model
-timeArrived time model =
-    case model.mouse.dragState of
-        -- we just pressed down; capture the start time
+timeArrived : Posix -> UndoModel -> ( UndoModel, Cmd Msg )
+timeArrived time ({ present } as undoModel) =
+    case present.mouse.dragState of
         WaitForStartTime class id mapPath pos ->
-            updateDragState model <| DragEngaged time class id mapPath pos
+            let
+                dragState =
+                    DragEngaged time class id mapPath pos
+            in
+            ( updateDragState present dragState, Cmd.none )
+                |> swap undoModel
 
-        -- after first move; decide DragTopic vs DrawAssoc by delay
         WaitForEndTime startTime class id mapPath pos ->
             let
-                isTopic =
-                    String.contains "dmx-topic" class
+                delay =
+                    posixToMillis time - posixToMillis startTime > assocDelayMillis
+
+                ( dragMode, historyFunc ) =
+                    if delay then
+                        ( DrawAssoc, swap )
+
+                    else
+                        ( DragTopic, push )
+
+                maybeOrigPos =
+                    getTopicPos id (getMapId mapPath) present.maps
+
+                dragState =
+                    case class of
+                        "dmx-topic" ->
+                            case maybeOrigPos of
+                                Just origPos ->
+                                    Drag dragMode id mapPath origPos pos Nothing
+
+                                Nothing ->
+                                    NoDrag
+
+                        -- error is already logged
+                        _ ->
+                            NoDrag
+
+                -- the error will be logged in performDrag
             in
-            if not isTopic then
-                model
+            ( updateDragState present dragState, Cmd.none )
+                |> historyFunc undoModel
 
-            else
-                let
-                    delay =
-                        posixToMillis time - posixToMillis startTime > assocDelayMillis
-
-                    dragMode =
-                        if delay then
-                            DrawAssoc
-
-                        else
-                            DragTopic
-
-                    mapId =
-                        getMapId mapPath
-
-                    origPos_ =
-                        getTopicPos id mapId model.maps
-                in
-                case origPos_ of
-                    Just origPos ->
-                        updateDragState model (Drag dragMode id mapPath origPos pos Nothing)
-
-                    Nothing ->
-                        model
-
-        -- while *engaged* or actually *dragging*, ignore extra ticks
-        DragEngaged _ _ _ _ _ ->
-            model
-
-        Drag _ _ _ _ _ _ ->
-            model
-
-        -- idle → ignore ticks
-        NoDrag ->
-            model
+        _ ->
+            logError "timeArrived"
+                "Received \"Time\" message when dragState is not WaitForTime"
+                ( undoModel, Cmd.none )
 
 
 mouseMove : Model -> Point -> ( Model, Cmd Msg )
 mouseMove model pos =
-    let
-        _ =
-            L.log "Move" { dragState = model.mouse.dragState, pos = pos }
-    in
     case model.mouse.dragState of
         DragEngaged time class id mapPath pos_ ->
             ( updateDragState model <| WaitForEndTime time class id mapPath pos_
@@ -155,31 +159,30 @@ mouseMove model pos =
         WaitForEndTime _ _ _ _ _ ->
             ( model, Cmd.none )
 
+        -- ignore -- TODO: can this happen at all? Is there a move listener?
         Drag _ _ _ _ _ _ ->
             ( performDrag model pos, Cmd.none )
 
         _ ->
-            U.logError "mouseMove"
-                "Received \"Move\" when dragState is not engaged/drag"
+            logError "mouseMove"
+                ("Received \"Move\" message when dragState is " ++ toString model.mouse.dragState)
                 ( model, Cmd.none )
 
 
 performDrag : Model -> Point -> Model
 performDrag model pos =
-    let
-        _ =
-            L.log "performDrag" { dragState = model.mouse.dragState, pos = pos }
-    in
     case model.mouse.dragState of
         Drag dragMode id mapPath origPos lastPos target ->
             let
                 delta =
-                    Point (pos.x - lastPos.x) (pos.y - lastPos.y)
+                    Point
+                        (pos.x - lastPos.x)
+                        (pos.y - lastPos.y)
 
                 mapId =
                     getMapId mapPath
 
-                nextModel =
+                newModel =
                     case dragMode of
                         DragTopic ->
                             setTopicPosByDelta id mapId delta model
@@ -187,43 +190,61 @@ performDrag model pos =
                         DrawAssoc ->
                             model
             in
-            updateDragState nextModel (Drag dragMode id mapPath origPos pos target)
+            -- update lastPos
+            updateDragState newModel (Drag dragMode id mapPath origPos pos target)
                 |> autoSize
 
         _ ->
-            U.logError "performDrag"
-                "Received \"Move\" when dragState is not Drag"
+            logError "performDrag"
+                ("Received \"Move\" message when dragState is " ++ toString model.mouse.dragState)
                 model
 
 
-mouseUp : Model -> ( Model, Cmd Msg )
-mouseUp model =
+mouseUp : UndoModel -> ( UndoModel, Cmd Msg )
+mouseUp ({ present } as undoModel) =
     let
-        ( newModel, cmd ) =
-            case model.mouse.dragState of
-                Drag DragTopic id fromPath origPos dropPos (Just (_targetId, toPath)) ->
+        ( model, cmd, historyFunc ) =
+            case present.mouse.dragState of
+                Drag DragTopic id mapPath origPos _ (Just ( targetId, targetMapPath )) ->
                     let
                         _ =
-                            L.log "mouseUp"
+                            info "mouseUp"
                                 ("dropped "
                                     ++ fromInt id
-                                    ++ " (map " ++ fromPath fromPath ++ ") "
-                                    ++ "on map " ++ fromPath toPath
+                                    ++ " (map "
+                                    ++ fromPath mapPath
+                                    ++ ") on "
+                                    ++ fromInt targetId
+                                    ++ " (map "
+                                    ++ fromPath targetMapPath
+                                    ++ ") --> "
+                                    ++ (if notDroppedOnOwnMap then
+                                            "move topic"
+
+                                        else
+                                            "abort"
+                                       )
                                 )
+
+                        mapId =
+                            getMapId mapPath
+
+                        notDroppedOnOwnMap =
+                            mapId /= targetId
+
+                        msg =
+                            MoveTopicToMap id mapId origPos targetId targetMapPath
                     in
-                    Contain.recontainToDepth model
-                        { id = id
-                        , fromPath = fromPath
-                        , toPath = toPath
-                        , origPos = origPos
-                        , dropPos = dropPos
-                        }
-                    
+                    if notDroppedOnOwnMap then
+                        ( present, Random.generate msg point, swap )
+
+                    else
+                        ( present, Cmd.none, swap )
 
                 Drag DrawAssoc id mapPath _ _ (Just ( targetId, targetMapPath )) ->
                     let
                         _ =
-                            L.log "mouseUp"
+                            info "mouseUp"
                                 ("assoc drawn from "
                                     ++ fromInt id
                                     ++ " (map "
@@ -249,31 +270,33 @@ mouseUp model =
                             mapId == getMapId targetMapPath
                     in
                     if isSameMap then
-                        ( createDefaultAssocIn id targetId mapId model, Cmd.none )
+                        ( createDefaultAssocIn id targetId mapId present, Cmd.none, push )
 
                     else
-                        ( model, Cmd.none )
+                        ( present, Cmd.none, swap )
 
                 Drag _ _ _ _ _ _ ->
                     let
                         _ =
-                            L.log "mouseUp" "drag ended w/o target"
+                            info "mouseUp" "drag ended w/o target"
                     in
-                    ( model, Cmd.none )
+                    ( present, Cmd.none, swap )
 
                 DragEngaged _ _ _ _ _ ->
                     let
                         _ =
-                            L.log "mouseUp" "drag aborted w/o moving"
+                            info "mouseUp" "drag aborted w/o moving"
                     in
-                    ( model, Cmd.none )
+                    ( present, Cmd.none, swap )
 
                 _ ->
-                    U.logError "mouseUp"
-                        ("Received \"Up\" message when dragState is " ++ L.toString model.mouse.dragState)
-                        ( model, Cmd.none )
+                    logError "mouseUp"
+                        ("Received \"Up\" message when dragState is " ++ toString present.mouse.dragState)
+                        ( present, Cmd.none, swap )
     in
-    ( updateDragState newModel NoDrag, cmd )
+    ( updateDragState model NoDrag, cmd )
+        |> storeModelWith
+        |> historyFunc undoModel
 
 
 point : Random.Generator Point
@@ -298,7 +321,7 @@ point =
 
 
 mouseOver : Model -> Class -> Id -> MapPath -> Model
-mouseOver model _ targetId targetMapPath =
+mouseOver model class targetId targetMapPath =
     case model.mouse.dragState of
         Drag dragMode id mapPath origPos lastPos _ ->
             let
@@ -320,14 +343,14 @@ mouseOver model _ targetId targetMapPath =
             updateDragState model <| Drag dragMode id mapPath origPos lastPos target
 
         DragEngaged _ _ _ _ _ ->
-            U.logError "mouseOver" "Received \"Over\" message when dragState is DragEngaged" model
+            logError "mouseOver" "Received \"Over\" message when dragState is DragEngaged" model
 
         _ ->
             model
 
 
 mouseOut : Model -> Class -> Id -> MapPath -> Model
-mouseOut model _ _ _ =
+mouseOut model class targetId targetMapPath =
     case model.mouse.dragState of
         Drag dragMode id mapPath origPos lastPos _ ->
             -- reset target
@@ -344,40 +367,16 @@ updateDragState ({ mouse } as model) dragState =
 
 
 -- SUBSCRIPTIONS
--- keep your existing subs like mouseDownSub / dragSub (shown here for clarity)
 
 
-dragSub : Sub Msg
-dragSub =
-    Sub.batch
-        [ Events.onMouseMove <|
-            D.map Mouse <|
-                D.map Move
-                    (D.map2 Point
-                        (D.field "clientX" D.float)
-                        (D.field "clientY" D.float)
-                    )
-        , Events.onMouseUp (D.succeed (Mouse Up))
-        ]
-
-
-
--- small helper: a 60fps-ish tick that feeds `Mouse Time`
-
-
-timeTick : Sub Msg
-timeTick =
-    Time.every 16 (Mouse << Time)
-
-
-mouseSubs : Model -> Sub Msg
-mouseSubs model =
-    case model.mouse.dragState of
+mouseSubs : UndoModel -> Sub Msg
+mouseSubs { present } =
+    case present.mouse.dragState of
         WaitForStartTime _ _ _ _ ->
-            timeTick
+            Sub.none
 
         WaitForEndTime _ _ _ _ _ ->
-            timeTick
+            Sub.none
 
         DragEngaged _ _ _ _ _ ->
             dragSub
@@ -393,36 +392,19 @@ mouseDownSub : Sub Msg
 mouseDownSub =
     Events.onMouseDown <|
         D.oneOf
-            [ D.map Mouse <|
-                D.map4 DownItem
-                    (D.oneOf
-                        [ D.at [ "target", "className" ] D.string -- HTML elements
-                        , D.at [ "target", "className", "baseVal" ] D.string -- SVG elements
-                        ]
-                    )
-                    (D.at [ "target", "dataset", "id" ] D.string |> D.andThen idDecoder)
-                    (D.at [ "target", "dataset", "path" ] D.string |> D.andThen pathDecoder)
-                    (D.map2 Point
-                        -- TODO: no code doubling
-                        (D.field "clientX" D.float)
-                        (D.field "clientY" D.float)
-                    )
+            [ D.map Mouse <| D.map4 DownOnItem classDecoder idDecoder pathDecoder pointDecoder
             , D.succeed (Mouse Down)
             ]
 
 
-
--- TODO: no code doubling
+dragSub : Sub Msg
+dragSub =
+    Sub.batch
+        [ Events.onMouseMove <| D.map Mouse <| D.map Move pointDecoder
+        , Events.onMouseUp <| D.map Mouse <| D.succeed Up
+        ]
 
 
 mouseDecoder : (Class -> Id -> MapPath -> MouseMsg) -> D.Decoder Msg
 mouseDecoder msg =
-    D.map Mouse <|
-        D.map3 msg
-            (D.oneOf
-                [ D.at [ "target", "className" ] D.string -- HTML elements
-                , D.at [ "target", "className", "baseVal" ] D.string -- SVG elements
-                ]
-            )
-            (D.at [ "target", "dataset", "id" ] D.string |> D.andThen idDecoder)
-            (D.at [ "target", "dataset", "path" ] D.string |> D.andThen pathDecoder)
+    D.map Mouse <| D.map3 msg classDecoder idDecoder pathDecoder

@@ -1,7 +1,6 @@
 module SearchAPI exposing (closeResultMenu, updateSearch, viewResultMenu, viewSearchInput)
 
-import AppModel exposing (Model, Msg(..))
-import Compat.ModelAPI exposing (addItemToMap)
+import AppModel exposing (Model, Msg(..), UndoModel)
 import Config exposing (contentFontSize, topicSize)
 import Dict
 import Html exposing (Attribute, Html, div, input, text)
@@ -9,19 +8,11 @@ import Html.Attributes exposing (attribute, style, value)
 import Html.Events exposing (on, onFocus, onInput)
 import Json.Decode as D
 import Model exposing (Id, ItemInfo(..), MapId, MapProps(..))
-import ModelAPI
-    exposing
-        ( activeMap
-        , defaultProps
-        , getTopicInfo
-        , idDecoder
-        , isItemInMap
-        , showItem
-        )
+import ModelAPI exposing (..)
 import Search exposing (ResultMenu(..), SearchMsg(..))
 import Storage exposing (storeModel)
 import String exposing (fromInt)
-import Utils exposing (..)
+import Utils exposing (idDecoder, info, logError, stopPropagationOnMousedown)
 
 
 
@@ -69,8 +60,8 @@ viewResultMenu model =
                             case getTopicInfo id model of
                                 Just topic ->
                                     div
-                                        (attribute "data-id" (fromInt id)
-                                            :: resultItemStyle id model
+                                        ([ attribute "data-id" (fromInt id) ]
+                                            ++ resultItemStyle id model
                                         )
                                         [ text topic.text ]
 
@@ -86,11 +77,7 @@ viewResultMenu model =
 
 itemDecoder : (Id -> SearchMsg) -> D.Decoder Msg
 itemDecoder msg =
-    D.map Search <|
-        D.map msg
-            (D.at [ "target", "dataset", "id" ] D.string
-                |> D.andThen idDecoder
-            )
+    D.map Search <| D.map msg idDecoder
 
 
 resultMenuStyle : List (Attribute Msg)
@@ -143,26 +130,27 @@ resultItemStyle topicId model =
 -- UPDATE
 
 
-updateSearch : SearchMsg -> Model -> ( Model, Cmd Msg )
-updateSearch msg model =
+updateSearch : SearchMsg -> UndoModel -> ( UndoModel, Cmd Msg )
+updateSearch msg ({ present } as undoModel) =
     case msg of
         Input text ->
-            ( onTextInput text model, Cmd.none )
+            ( onTextInput text present, Cmd.none ) |> swap undoModel
 
         FocusInput ->
-            ( onFocusInput model, Cmd.none )
+            ( onFocusInput present, Cmd.none ) |> swap undoModel
 
         HoverItem topicId ->
-            ( onHoverItem topicId model, Cmd.none )
+            ( onHoverItem topicId present, Cmd.none ) |> swap undoModel
 
         UnhoverItem _ ->
-            ( onUnhoverItem model, Cmd.none )
+            ( onUnhoverItem present, Cmd.none ) |> swap undoModel
 
         ClickItem topicId ->
-            model
-                |> revealTopic topicId (activeMap model)
+            present
+                |> revealTopic topicId (activeMap present)
                 |> closeResultMenu
                 |> storeModel
+                |> push undoModel
 
 
 onTextInput : String -> Model -> Model
