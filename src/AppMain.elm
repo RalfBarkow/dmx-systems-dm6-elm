@@ -5,7 +5,9 @@ import Browser
 import Json.Decode as D
 import Json.Encode as E
 import Main
+import MouseAPI exposing (mouseHoverHandler, mouseSubs, updateMouse)
 import Platform.Sub as Sub
+import UndoList
 
 
 
@@ -20,12 +22,12 @@ type alias Msg =
     AM.Msg
 
 
-main : Program D.Value Model Msg
+main : Program D.Value AM.UndoModel Msg
 main =
     Browser.document
         { init = init
         , update = Main.update
-        , subscriptions = subscriptions
+        , subscriptions = mouseSubs
         , view = Main.view
         }
 
@@ -34,7 +36,7 @@ main =
 -- Accept any JSON and fall back to a tiny default flags object
 
 
-init : D.Value -> ( Model, Cmd Msg )
+init : D.Value -> ( AM.UndoModel, Cmd Msg )
 init flagsVal =
     case D.decodeValue flagsDecoder flagsVal of
         Ok _ ->

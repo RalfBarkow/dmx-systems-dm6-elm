@@ -1,68 +1,42 @@
-module IconMenuAPI exposing
-    ( closeIconMenu
-    , openIconMenu
-    , setIcon
-    , updateIconMenu
-    , viewIcon
-    , viewIconMenu
-    , viewTopicIcon
-    )
+module IconMenuAPI exposing (closeIconMenu, updateIconMenu, viewIcon, viewIconMenu, viewTopicIcon)
 
-import AppModel as AM
+-- components
+
+import AppModel exposing (..)
+import Config exposing (..)
 import Dict
 import FeatherIcons as Icon
-import Html as H
-import Html.Attributes as HA
-import Html.Events as HE
-import IconMenu as IM exposing (IconMenuMsg(..))
-import Json.Decode as D
-import Model as M exposing (IconName, Id)
+import Html exposing (Attribute, Html, button, div, text)
+import Html.Attributes exposing (style, title)
+import Html.Events exposing (onClick)
+import IconMenu exposing (IconMenuMsg(..))
+import Model exposing (..)
+import ModelAPI exposing (..)
+import Storage exposing (storeModel)
 import String exposing (fromFloat)
-
-
-viewIcon : String -> Float -> H.Html msg
-viewIcon iconName sizePx =
-    case Dict.get iconName Icon.icons of
-        Just icon ->
-            icon |> Icon.withSize sizePx |> Icon.toHtml []
-
-        Nothing ->
-            H.text "??"
+import Utils exposing (..)
 
 
 
--- VIEW ----------------------------------------------------------------------
+-- VIEW
 
 
-{-| Small button that sits on the topic and opens the icon menu.
--}
-viewTopicIcon : M.Id -> AM.Model -> H.Html AM.Msg
-viewTopicIcon topicId model =
-    let
-        titleText =
-            "Choose icon"
-    in
-    H.button
-        ([ HE.onClick (AM.IconMenu IM.Open)
-         , HA.title titleText
-         ]
-            ++ topicIconStyle
-        )
-        [ H.text "…"
-        ]
-
-
-{-| Overlay panel with icon choices. Only rendered when menu is open.
--}
-viewIconMenu : AM.Model -> List (H.Html AM.Msg)
+viewIconMenu : Model -> List (Html Msg)
 viewIconMenu model =
     if model.iconMenu.open then
-        [ H.div
-            (iconMenuStyle ++ [ onContextMenuPrevent (AM.IconMenu IM.Close) ])
-            [ H.div closeButtonStyle
-                [ H.button [ HE.onClick (AM.IconMenu IM.Close) ] [ H.text "×" ] ]
-            , H.div (iconListStyle ++ [ HA.title "Pick an icon" ])
+        [ div
+            iconMenuStyle
+            [ div
+                iconListStyle
                 viewIconList
+            , button
+                ([ onClick (IconMenu Close) ]
+                    ++ closeButtonStyle
+                )
+                [ Icon.x
+                    |> Icon.withSize 12
+                    |> Icon.toHtml []
+                ]
             ]
         ]
 
@@ -70,19 +44,43 @@ viewIconMenu model =
         []
 
 
+iconMenuStyle : List (Attribute Msg)
+iconMenuStyle =
+    [ style "position" "absolute"
+    , style "top" "291px"
+    , style "width" "320px"
+    , style "height" "320px"
+    , style "background-color" "white"
+    , style "border" "1px solid lightgray"
+    , style "z-index" "1"
+    ]
 
--- A tiny “catalog” of icon names for now. Swap with your real list later.
+
+iconListStyle : List (Attribute Msg)
+iconListStyle =
+    [ style "height" "100%"
+    , style "overflow" "auto"
+    ]
 
 
-viewIconList : List (H.Html AM.Msg)
+closeButtonStyle : List (Attribute Msg)
+closeButtonStyle =
+    [ style "position" "absolute"
+    , style "top" "0"
+    , style "right" "0"
+    ]
+
+
+viewIconList : List (Html Msg)
 viewIconList =
     Icon.icons
         |> Dict.toList
         |> List.map
             (\( iconName, icon ) ->
-                H.button
-                    ([ HE.onClick (AM.IconMenu (IM.SetIcon (Just iconName)))
-                     , HA.title iconName
+                button
+                    ([ onClick (Just iconName |> SetIcon |> IconMenu)
+                     , stopPropagationOnMousedown NoOp
+                     , title iconName
                      ]
                         ++ iconButtonStyle
                     )
@@ -90,137 +88,93 @@ viewIconList =
             )
 
 
-
--- STYLE ---------------------------------------------------------------------
-
-
-iconMenuStyle : List (H.Attribute AM.Msg)
-iconMenuStyle =
-    [ HA.style "position" "absolute"
-    , HA.style "top" "291px"
-    , HA.style "width" "320px"
-    , HA.style "height" "320px"
-    , HA.style "background-color" "white"
-    , HA.style "border" "1px solid lightgray"
-    , HA.style "z-index" "1"
-    ]
-
-
-iconListStyle : List (H.Attribute AM.Msg)
-iconListStyle =
-    [ HA.style "height" "100%"
-    , HA.style "overflow" "auto"
-    ]
-
-
-closeButtonStyle : List (H.Attribute AM.Msg)
-closeButtonStyle =
-    [ HA.style "position" "absolute"
-    , HA.style "top" "0"
-    , HA.style "right" "0"
-    ]
-
-
-iconButtonStyle : List (H.Attribute AM.Msg)
+iconButtonStyle : List (Attribute Msg)
 iconButtonStyle =
-    [ HA.style "border-width" "0"
-    , HA.style "margin" "8px"
+    [ style "border-width" "0"
+    , style "margin" "8px"
     ]
 
 
-topicIconStyle : List (H.Attribute AM.Msg)
+viewTopicIcon : Id -> Model -> Html Msg
+viewTopicIcon topicId model =
+    case getTopicInfo topicId model of
+        Just topic ->
+            case topic.iconName of
+                Just iconName ->
+                    case Icon.icons |> Dict.get iconName of
+                        Just icon ->
+                            icon |> Icon.withSize topicIconSize |> Icon.toHtml topicIconStyle
+
+                        Nothing ->
+                            text "??"
+
+                Nothing ->
+                    text ""
+
+        Nothing ->
+            text "?"
+
+
+viewIcon : String -> Float -> Html Msg
+viewIcon iconName size =
+    case Icon.icons |> Dict.get iconName of
+        Just icon ->
+            icon |> Icon.withSize size |> Icon.toHtml []
+
+        Nothing ->
+            text "??"
+
+
+topicIconStyle : List (Attribute Msg)
 topicIconStyle =
-    [ HA.style "position" "relative"
-    , HA.style "top" "0px"
-    , HA.style "left" "0px"
-    , HA.style "color" "white"
+    [ style "position" "relative"
+    , style "top" <| fromFloat ((topicSize.h - topicIconSize) / 2) ++ "px"
+    , style "left" <| fromFloat ((topicSize.h - topicIconSize) / 2) ++ "px"
+    , style "color" "white"
     ]
 
 
 
--- EVENTS --------------------------------------------------------------------
+-- UPDATE
 
 
-{-| Prevent native context menu if you wire this to `onContextMenu`.
--}
-onContextMenuPrevent : msg -> H.Attribute msg
-onContextMenuPrevent msg =
-    HE.custom "contextmenu"
-        (D.succeed
-            { message = msg
-            , stopPropagation = True
-            , preventDefault = True
-            }
-        )
-
-
-
--- UPDATE --------------------------------------------------------------------
-
-
-updateIconMenu : IM.IconMenuMsg -> AM.Model -> ( AM.Model, Cmd AM.Msg )
-updateIconMenu msg model =
+updateIconMenu : IconMenuMsg -> UndoModel -> ( UndoModel, Cmd Msg )
+updateIconMenu msg ({ present } as undoModel) =
     case msg of
-        IM.Open ->
-            ( openIconMenu model, Cmd.none )
+        Open ->
+            ( openIconMenu present, Cmd.none ) |> swap undoModel
 
-        IM.Close ->
-            ( closeIconMenu model, Cmd.none )
+        Close ->
+            ( closeIconMenu present, Cmd.none ) |> swap undoModel
 
-        IM.SetIcon maybeIcon ->
-            ( setIcon maybeIcon model, Cmd.none )
-
-        -- new constructors — safe defaults for now
-        IM.OpenAt _ _ ->
-            ( openIconMenu model, Cmd.none )
-
-        IM.Hover _ ->
-            ( model, Cmd.none )
-
-        IM.Pick _ ->
-            ( model, Cmd.none )
-
-        IM.Picked action ->
-            -- if you later map actions to real AM.Msg, do it here
-            ( closeIconMenu model, Cmd.none )
-
-        IM.OutsideClick ->
-            ( closeIconMenu model, Cmd.none )
-
-        IM.KeyDown key ->
-            if key == "Escape" then
-                ( closeIconMenu model, Cmd.none )
-
-            else
-                ( model, Cmd.none )
-
-        IM.NoOp ->
-            ( model, Cmd.none )
+        SetIcon maybeIcon ->
+            setIcon maybeIcon present
+                |> closeIconMenu
+                |> storeModel
+                |> push undoModel
 
 
-openIconMenu : AM.Model -> AM.Model
-openIconMenu model =
-    let
-        m =
-            model.iconMenu
-    in
-    { model | iconMenu = { m | open = True } }
+openIconMenu : Model -> Model
+openIconMenu ({ iconMenu } as model) =
+    { model | iconMenu = { iconMenu | open = True } }
 
 
-closeIconMenu : AM.Model -> AM.Model
-closeIconMenu model =
-    let
-        m =
-            model.iconMenu
-    in
-    { model | iconMenu = { m | open = False } }
+closeIconMenu : Model -> Model
+closeIconMenu ({ iconMenu } as model) =
+    { model | iconMenu = { iconMenu | open = False } }
 
 
-setIcon : Maybe M.IconName -> AM.Model -> AM.Model
-setIcon maybeIcon model =
-    let
-        m =
-            model.iconMenu
-    in
-    -- TODO: apply icon selection to topic; for now just close the menu
-    { model | iconMenu = { m | open = False } }
+setIcon : Maybe IconName -> Model -> Model
+setIcon iconName model =
+    case getSingleSelection model of
+        Just ( id, _ ) ->
+            updateTopicInfo id
+                (\topic -> { topic | iconName = iconName })
+                model
+
+        Nothing ->
+            model
+
+
+
+-- FIXME: illegal state -> make Edit dialog modal

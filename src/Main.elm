@@ -1,39 +1,46 @@
-module Main exposing (..)
+port module Main exposing (..)
 
-import AppModel exposing (..)
+import AppModel as AM
 import Boxing exposing (boxContainer, unboxContainer)
 import Browser
 import Browser.Dom as Dom
-import Compat.FedWiki as FW exposing (decodePage, pageToModel)
-import Compat.FedWikiImport as FedWiki
-import Compat.ModelAPI as ModelAPI exposing (addItemToMap)
+import Compat.FedWiki as FW
 import Config exposing (..)
 import Dict
-import Html exposing (Attribute, Html, br, button, div, text, textarea)
-import Html.Attributes as HA exposing (id, style)
-import Html.Events as HE
+import Html exposing (Attribute, Html, br, div, text)
+import Html.Attributes exposing (id, style)
 import IconMenuAPI exposing (updateIconMenu, viewIconMenu)
 import Json.Decode as D
 import Json.Encode as E
-import Logger as L
 import MapAutoSize exposing (autoSize)
 import MapRenderer exposing (viewMap)
 import Model exposing (..)
-import ModelAPI exposing (activeMap, createMap, createTopicIn, deleteItem, getMapId, getSingleSelection, getTopicProps, hasMap, hideItem, isItemInMap, select, setDisplayMode, setTopicPos, setTopicSize, updateMapRect, updateTopicInfo, updateTopicProps)
+import ModelAPI exposing (..)
 import MouseAPI exposing (mouseHoverHandler, mouseSubs, updateMouse)
 import SearchAPI exposing (updateSearch, viewResultMenu)
 import Storage exposing (modelDecoder, storeModel, storeModelWith)
 import String exposing (fromFloat, fromInt)
 import Task
-import UI.Toolbar exposing (viewToolbar)
-import Utils as U
+import Toolbar exposing (viewToolbar)
+import UndoList
+import Utils exposing (..)
+
+
+
+-- PORTS
+
+
+port importJSON : () -> Cmd msg
+
+
+port exportJSON : () -> Cmd msg
 
 
 
 -- MAIN
 
 
-main : Program E.Value Model Msg
+main : Program E.Value AM.UndoModel AM.Msg
 main =
     Browser.document
         { init = init
@@ -43,116 +50,66 @@ main =
         }
 
 
-trace : String -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
-trace tag (( m, cmd ) as result) =
-    let
-        _ =
-            L.log ("update." ++ tag) ""
-    in
-    result
-
-
-traceWith : String -> String -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
-traceWith tag payload (( m, cmd ) as result) =
-    let
-        _ =
-            L.log
-                ("update."
-                    ++ tag
-                    ++ (if payload == "" then
-                            ""
-
-                        else
-                            " | " ++ payload
-                       )
-                )
-                ""
-    in
-    result
-
-
-describeDisplayMode : DisplayMode -> String
-describeDisplayMode dm =
-    case dm of
-        Monad LabelOnly ->
-            "Monad(LabelOnly)"
-
-        Monad Detail ->
-            "Monad(Detail)"
-
-        Container BlackBox ->
-            "Container(BlackBox)"
-
-        Container WhiteBox ->
-            "Container(WhiteBox)"
-
-        Container Unboxed ->
-            "Container(Unboxed)"
-
-
-
--- INIT
-
-
-init : E.Value -> ( Model, Cmd Msg )
+init : E.Value -> ( AM.UndoModel, Cmd AM.Msg )
 init flags =
-    ( case flags |> D.decodeValue (D.null True) of
+    ( initModel flags, Cmd.none ) |> reset
+
+
+initModel : E.Value -> AM.Model
+initModel flags =
+    case flags |> D.decodeValue (D.null True) of
         Ok True ->
             let
                 _ =
-                    L.log "init" "localStorage: empty"
+                    info "init" "localStorage: empty"
             in
-            default
+            AM.default
 
         _ ->
             case flags |> D.decodeValue modelDecoder of
                 Ok model ->
                     let
                         _ =
-                            L.log "init"
-                                ("localStorage: " ++ (model |> L.toString |> String.length |> fromInt) ++ " bytes")
+                            info "init"
+                                ("localStorage: " ++ (model |> toString |> String.length |> fromInt) ++ " bytes")
                     in
                     model
 
                 Err e ->
                     let
                         _ =
-                            U.logError "init" "localStorage" e
+                            logError "init" "localStorage" e
                     in
-                    default
-    , Cmd.none
-    )
+                    AM.default
 
 
 
 -- VIEW
 
 
-view : Model -> Browser.Document Msg
-view model =
+view : AM.UndoModel -> Browser.Document AM.Msg
+view ({ present } as undoModel) =
     Browser.Document
         "DM6 Elm"
         [ div
             (mouseHoverHandler
                 ++ appStyle
             )
-            ([ viewToolbar model
-             , viewMap (activeMap model) [] model -- mapPath = []
+            ([ viewToolbar undoModel
+             , viewMap (activeMap present) [] present -- mapPath = []
              ]
-                ++ viewResultMenu model
-                ++ viewIconMenu model
+                ++ viewResultMenu present
+                ++ viewIconMenu present
             )
         , div
-            ([ id "measure" ]
-                ++ measureStyle
-            )
-            [ text model.measureText
+            (id "measure" :: measureStyle)
+            [ text present.measureText
             , br [] []
             ]
         ]
 
 
-appStyle : List (Attribute Msg)
+appStyle : List (Attribute AM.Msg)
 appStyle =
     [ style "font-family" mainFont
     , style "user-select" "none"
@@ -160,7 +117,7 @@ appStyle =
     ]
 
 
-measureStyle : List (Attribute Msg)
+measureStyle : List (Attribute AM.Msg)
 measureStyle =
     [ style "position" "fixed"
     , style "visibility" "hidden"
@@ -182,135 +139,131 @@ measureStyle =
 -- UPDATE
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
+update : AM.Msg -> AM.UndoModel -> ( AM.UndoModel, Cmd AM.Msg )
+update msg ({ present } as undoModel) =
     let
         _ =
             case msg of
-                Mouse _ ->
+                AM.Mouse _ ->
                     msg
 
                 _ ->
-                    L.log "update" msg
+                    info "update" msg
     in
     case msg of
-        SetFedWikiRaw s ->
-            ( { model | fedWikiRaw = s }, Cmd.none )
-                |> traceWith "fedwiki.raw" ("len=" ++ String.fromInt (String.length s))
+        AM.SetFedWikiRaw s ->
+            ( { present | fedWikiRaw = s }, Cmd.none )
+                |> push undoModel
 
-        FedWikiPage raw ->
-            let
-                newModel =
-                    case D.decodeString FW.decodePage raw of
-                        Ok page ->
-                            FW.pageToModel page model
+        AM.FedWikiPage raw ->
+            case D.decodeString FW.decodePage raw of
+                Ok val ->
+                    let
+                        before =
+                            Dict.size present.items
 
-                        Err _ ->
-                            model
-            in
-            ( { newModel | fedWikiRaw = raw }, Cmd.none )
-                |> traceWith "fedwiki" ("len=" ++ String.fromInt (String.length raw))
+                        ( m1, cmd ) =
+                            FW.pageToModel val present
 
-        AddTopic ->
-            createTopicIn topicDefaultText Nothing [ activeMap model ] model
+                        after =
+                            Dict.size m1.items
+
+                        _ =
+                            info "fedwiki.import" { before = before, after = after, created = after - before, activeMap = activeMap m1 }
+                    in
+                    ( { m1 | fedWikiRaw = raw }, cmd )
+                        |> push undoModel
+
+                Err _ ->
+                    ( { present | fedWikiRaw = raw }, Cmd.none )
+                        |> push undoModel
+
+        AM.AddTopic ->
+            createTopicIn topicDefaultText Nothing [ activeMap present ] present
                 |> storeModel
-                |> trace "addTopic"
+                |> push undoModel
 
-        MoveTopicToMap topicId mapId origPos targetId targetMapPath pos ->
-            moveTopicToMap topicId mapId origPos targetId targetMapPath pos model
+        AM.MoveTopicToMap topicId mapId origPos targetId targetMapPath pos ->
+            moveTopicToMap topicId mapId origPos targetId targetMapPath pos present
                 |> storeModel
-                |> traceWith "moveTopic"
-                    ("topic="
-                        ++ String.fromInt topicId
-                        ++ " -> "
-                        ++ String.fromInt targetId
-                    )
+                |> push undoModel
 
-        SwitchDisplay displayMode ->
-            switchDisplay displayMode model
+        AM.SwitchDisplay displayMode ->
+            switchDisplay displayMode present
                 |> storeModel
-                |> traceWith "switchDisplay" (describeDisplayMode displayMode)
+                |> swap undoModel
 
-        Search searchMsg ->
-            updateSearch searchMsg model
-                |> trace "search"
+        AM.Search searchMsg ->
+            updateSearch searchMsg undoModel
 
-        Edit editMsg ->
-            updateEdit editMsg model
-                |> trace "edit"
+        AM.Edit editMsg ->
+            updateEdit editMsg undoModel
 
-        IconMenu iconMenuMsg ->
-            updateIconMenu iconMenuMsg model
-                |> trace "iconMenu"
+        AM.IconMenu iconMenuMsg ->
+            updateIconMenu iconMenuMsg undoModel
 
-        Mouse mouseMsg ->
-            updateMouse mouseMsg model
-                |> trace "mouse"
+        AM.Mouse mouseMsg ->
+            updateMouse mouseMsg undoModel
 
-        Nav navMsg ->
-            updateNav navMsg model
-                |> storeModel
-                |> trace "nav"
+        AM.Nav navMsg ->
+            updateNav navMsg present |> storeModel |> reset
 
-        Hide ->
-            hide model
-                |> storeModel
-                |> trace "hide"
+        AM.Hide ->
+            hide present |> storeModel |> push undoModel
 
-        Delete ->
-            delete model
-                |> storeModel
-                |> trace "delete"
+        AM.Delete ->
+            delete present |> storeModel |> push undoModel
 
-        NoOp ->
-            ( model, Cmd.none )
+        AM.Undo ->
+            undo undoModel
 
+        AM.Redo ->
+            redo undoModel
 
+        AM.Import ->
+            ( present, importJSON () ) |> swap undoModel
 
--- Derive targetMapId from the path; upstream createMapIfNeeded takes 2 args
+        AM.Export ->
+            ( present, exportJSON () ) |> swap undoModel
+
+        AM.NoOp ->
+            ( present, Cmd.none ) |> swap undoModel
 
 
-moveTopicToMap : Id -> MapId -> Point -> Id -> List MapId -> Point -> Model -> Model
-moveTopicToMap topicId containerId origPos targetId targetMapPath newPos model0 =
+moveTopicToMap : Id -> MapId -> Point -> Id -> MapPath -> Point -> AM.Model -> AM.Model
+moveTopicToMap topicId mapId origPos targetId targetMapPath pos model =
     let
-        targetMapId =
-            targetMapPath |> List.reverse |> List.head |> Maybe.withDefault 0
+        ( newModel, created ) =
+            createMapIfNeeded targetId model
 
-        isSelfTarget =
-            targetId == topicId
+        newPos =
+            case created of
+                True ->
+                    Point
+                        (topicW2 + whiteBoxPadding)
+                        (topicH2 + whiteBoxPadding)
 
-        ( model1, created ) =
-            createMapIfNeeded targetId model0
-
-        actualPos =
-            if created then
-                Point (topicW2 + whiteBoxPadding) (topicH2 + whiteBoxPadding)
-
-            else
-                newPos
+                False ->
+                    pos
 
         props_ =
-            getTopicProps topicId containerId model1.maps
-                |> Maybe.map (\p -> MapTopic { p | pos = actualPos })
+            getTopicProps topicId mapId newModel.maps
+                |> Maybe.andThen (\props -> Just (MapTopic { props | pos = newPos }))
     in
-    if isSelfTarget then
-        model0
+    case props_ of
+        Just props ->
+            newModel
+                |> hideItem topicId mapId
+                |> setTopicPos topicId mapId origPos
+                |> addItemToMap topicId props targetId
+                |> select targetId targetMapPath
+                |> autoSize
 
-    else
-        case props_ of
-            Just props ->
-                model1
-                    |> hideItem topicId containerId
-                    |> setTopicPos topicId containerId origPos
-                    |> addItemToMap topicId props targetId
-                    |> select targetId targetMapPath
-                    |> autoSize
-
-            Nothing ->
-                model0
+        Nothing ->
+            model
 
 
-createMapIfNeeded : Id -> Model -> ( Model, Bool )
+createMapIfNeeded : Id -> AM.Model -> ( AM.Model, Bool )
 createMapIfNeeded topicId model =
     if hasMap topicId model.maps then
         ( model, False )
@@ -326,7 +279,7 @@ createMapIfNeeded topicId model =
         )
 
 
-setDisplayModeInAllMaps : Id -> DisplayMode -> Model -> Model
+setDisplayModeInAllMaps : Id -> DisplayMode -> AM.Model -> AM.Model
 setDisplayModeInAllMaps topicId displayMode model =
     model.maps
         |> Dict.foldr
@@ -341,7 +294,7 @@ setDisplayModeInAllMaps topicId displayMode model =
             model
 
 
-switchDisplay : DisplayMode -> Model -> Model
+switchDisplay : DisplayMode -> AM.Model -> AM.Model
 switchDisplay displayMode model =
     (case getSingleSelection model of
         Just ( containerId, mapPath ) ->
@@ -376,30 +329,32 @@ switchDisplay displayMode model =
 -- Text Edit
 
 
-updateEdit : EditMsg -> Model -> ( Model, Cmd Msg )
-updateEdit msg model =
+updateEdit : EditMsg -> AM.UndoModel -> ( AM.UndoModel, Cmd AM.Msg )
+updateEdit msg ({ present } as undoModel) =
     case msg of
         EditStart ->
-            startEdit model
+            startEdit present |> push undoModel
 
         OnTextInput text ->
-            onTextInput text model |> storeModel
+            onTextInput text present |> storeModel |> swap undoModel
 
         OnTextareaInput text ->
-            onTextareaInput text model |> storeModelWith
+            onTextareaInput text present |> storeModelWith |> swap undoModel
 
         SetTopicSize topicId mapId size ->
-            ( model
+            ( present
                 |> setTopicSize topicId mapId size
                 |> autoSize
             , Cmd.none
             )
+                |> swap undoModel
 
         EditEnd ->
-            ( endEdit model, Cmd.none )
+            ( endEdit present, Cmd.none )
+                |> swap undoModel
 
 
-startEdit : Model -> ( Model, Cmd Msg )
+startEdit : AM.Model -> ( AM.Model, Cmd AM.Msg )
 startEdit model =
     let
         newModel =
@@ -415,7 +370,7 @@ startEdit model =
     ( newModel, focus newModel )
 
 
-setDetailDisplayIfMonade : Id -> MapId -> Model -> Model
+setDetailDisplayIfMonade : Id -> MapId -> AM.Model -> AM.Model
 setDetailDisplayIfMonade topicId mapId model =
     model
         |> updateTopicProps topicId
@@ -430,7 +385,7 @@ setDetailDisplayIfMonade topicId mapId model =
             )
 
 
-onTextInput : String -> Model -> Model
+onTextInput : String -> AM.Model -> AM.Model
 onTextInput text model =
     case model.editState of
         ItemEdit topicId _ ->
@@ -439,10 +394,10 @@ onTextInput text model =
                 model
 
         NoEdit ->
-            U.logError "onTextInput" "called when editState is NoEdit" model
+            logError "onTextInput" "called when editState is NoEdit" model
 
 
-onTextareaInput : String -> Model -> ( Model, Cmd Msg )
+onTextareaInput : String -> AM.Model -> ( AM.Model, Cmd AM.Msg )
 onTextareaInput text model =
     case model.editState of
         ItemEdit topicId mapId ->
@@ -452,10 +407,10 @@ onTextareaInput text model =
                 |> measureText text topicId mapId
 
         NoEdit ->
-            U.logError "onTextareaInput" "called when editState is NoEdit" ( model, Cmd.none )
+            logError "onTextareaInput" "called when editState is NoEdit" ( model, Cmd.none )
 
 
-measureText : String -> Id -> MapId -> Model -> ( Model, Cmd Msg )
+measureText : String -> Id -> MapId -> AM.Model -> ( AM.Model, Cmd AM.Msg )
 measureText text topicId mapId model =
     ( { model | measureText = text }
     , Dom.getElement "measure"
@@ -463,25 +418,25 @@ measureText text topicId mapId model =
             (\result ->
                 case result of
                     Ok elem ->
-                        Edit
+                        AM.Edit
                             (SetTopicSize topicId
                                 mapId
                                 (Size elem.element.width elem.element.height)
                             )
 
                     Err err ->
-                        U.logError "measureText" (L.toString err) NoOp
+                        logError "measureText" (toString err) AM.NoOp
             )
     )
 
 
-endEdit : Model -> Model
+endEdit : AM.Model -> AM.Model
 endEdit model =
     { model | editState = NoEdit }
         |> autoSize
 
 
-focus : Model -> Cmd Msg
+focus : AM.Model -> Cmd AM.Msg
 focus model =
     let
         nodeId =
@@ -490,17 +445,17 @@ focus model =
                     "dmx-input-" ++ fromInt id ++ "-" ++ fromInt mapId
 
                 NoEdit ->
-                    U.logError "focus" "called when editState is NoEdit" ""
+                    logError "focus" "called when editState is NoEdit" ""
     in
     Dom.focus nodeId
         |> Task.attempt
             (\result ->
                 case result of
                     Ok () ->
-                        NoOp
+                        AM.NoOp
 
                     Err e ->
-                        U.logError "focus" (L.toString e) NoOp
+                        logError "focus" (toString e) AM.NoOp
             )
 
 
@@ -508,7 +463,7 @@ focus model =
 --
 
 
-updateNav : NavMsg -> Model -> Model
+updateNav : NavMsg -> AM.Model -> AM.Model
 updateNav navMsg model =
     case navMsg of
         Fullscreen ->
@@ -518,14 +473,12 @@ updateNav navMsg model =
             back model
 
 
-fullscreen : Model -> Model
+fullscreen : AM.Model -> AM.Model
 fullscreen model =
     case getSingleSelection model of
         Just ( topicId, _ ) ->
-            { model
-                | mapPath = topicId :: model.mapPath
-                , selection = []
-            }
+            { model | mapPath = topicId :: model.mapPath }
+                |> resetSelection
                 |> createMapIfNeeded topicId
                 |> Tuple.first
                 |> adjustMapRect topicId -1
@@ -534,10 +487,10 @@ fullscreen model =
             model
 
 
-back : Model -> Model
+back : AM.Model -> AM.Model
 back model =
     let
-        ( mapId, mapPath, selection ) =
+        ( mapId, mapPath, _ ) =
             case model.mapPath of
                 prevMapId :: nextMapId :: mapIds ->
                     ( prevMapId
@@ -546,7 +499,7 @@ back model =
                     )
 
                 _ ->
-                    U.logError "back" "model.mapPath has a problem" ( 0, [ 0 ], [] )
+                    logError "back" "model.mapPath has a problem" ( 0, [ 0 ], [] )
     in
     { model
         | mapPath = mapPath
@@ -557,7 +510,7 @@ back model =
         |> autoSize
 
 
-adjustMapRect : MapId -> Float -> Model -> Model
+adjustMapRect : MapId -> Float -> AM.Model -> AM.Model
 adjustMapRect mapId factor model =
     model
         |> updateMapRect mapId
@@ -572,7 +525,7 @@ adjustMapRect mapId factor model =
             )
 
 
-hide : Model -> Model
+hide : AM.Model -> AM.Model
 hide model =
     let
         newModel =
@@ -581,11 +534,12 @@ hide model =
                     (\( itemId, mapPath ) modelAcc -> hideItem itemId (getMapId mapPath) modelAcc)
                     model
     in
-    { newModel | selection = [] }
+    newModel
+        |> resetSelection
         |> autoSize
 
 
-delete : Model -> Model
+delete : AM.Model -> AM.Model
 delete model =
     let
         newModel =
@@ -595,16 +549,53 @@ delete model =
                     (\itemId modelAcc -> deleteItem itemId modelAcc)
                     model
     in
-    { newModel | selection = [] }
+    newModel
+        |> resetSelection
         |> autoSize
 
 
 
--- Map-only element view for embedding
+-- Undo / Redo
 
 
-viewElementMap : Model -> Html Msg
-viewElementMap model =
+undo : AM.UndoModel -> ( AM.UndoModel, Cmd AM.Msg )
+undo undoModel =
+    let
+        newUndoModel =
+            UndoList.undo undoModel
+
+        newModel =
+            AM.resetTransientState newUndoModel.present
+    in
+    newModel
+        |> storeModel
+        |> swap newUndoModel
+
+
+redo : AM.UndoModel -> ( AM.UndoModel, Cmd AM.Msg )
+redo undoModel =
+    let
+        newUndoModel =
+            UndoList.redo undoModel
+
+        newModel =
+            AM.resetTransientState newUndoModel.present
+    in
+    newModel
+        |> storeModel
+        |> swap newUndoModel
+
+
+
+-- Map-only element view for embedding (kept for AppEmbed compatibility)
+
+
+viewElementMap : AM.UndoModel -> Html AM.Msg
+viewElementMap undoModel =
+    let
+        present =
+            undoModel.present
+    in
     div
         (mouseHoverHandler ++ appStyle)
-        [ viewMap (activeMap model) [] model ]
+        [ viewMap (activeMap present) [] present ]

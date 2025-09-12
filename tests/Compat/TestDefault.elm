@@ -10,7 +10,11 @@ import Test exposing (..)
 
 defaultModel : AM.Model
 defaultModel =
-    Tuple.first (AdapterMain.init E.null)
+    let
+        ( undo, _ ) =
+            AdapterMain.init E.null
+    in
+    undo.present
 
 
 
@@ -23,22 +27,31 @@ suite =
         [ test "init with E.null cold-boots to default model" <|
             \_ ->
                 let
+                    ( undo, _ ) =
+                        AdapterMain.init E.null
+
                     m =
-                        Tuple.first (AdapterMain.init E.null)
+                        undo.present
                 in
                 Expect.equal [ 0 ] m.mapPath
         , test "home map (0) exists" <|
             \_ ->
                 let
+                    ( undo, _ ) =
+                        AdapterMain.init E.null
+
                     m =
-                        Tuple.first (AdapterMain.init E.null)
+                        undo.present
                 in
                 Expect.equal True (Dict.member 0 m.maps)
         , test "nextId starts at 1" <|
             \_ ->
                 let
+                    ( undo, _ ) =
+                        AdapterMain.init E.null
+
                     m =
-                        Tuple.first (AdapterMain.init E.null)
+                        undo.present
                 in
                 Expect.equal 1 m.nextId
         ]

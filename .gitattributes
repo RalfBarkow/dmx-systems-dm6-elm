@@ -1,0 +1,7 @@
+# never take upstream edits to these
+src/AppEmbed.elm     merge=ours
+src/AppRunner.elm    merge=ours
+src/Compat/**        merge=ours
+
+# if you must carry a local variant (try to avoid):
+# src/Utils.elm      merge=ours

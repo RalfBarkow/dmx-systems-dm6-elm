@@ -683,8 +683,8 @@ htmlTopicAttr id mapPath =
     , attribute "data-id" (fromInt id)
     , attribute "data-path" (fromPath mapPath)
     , style "cursor" "move"
-    , on "mousedown" (D.map (Mouse << DownItem topicCls id mapPath) posDecoder)
-    , on "pointerdown" (D.map (Mouse << DownItem topicCls id mapPath) posDecoder)
+    , on "mousedown" (D.map (Mouse << DownOnItem topicCls id mapPath) posDecoder)
+    , on "pointerdown" (D.map (Mouse << DownOnItem topicCls id mapPath) posDecoder)
     ]
 
 
@@ -698,8 +698,8 @@ svgTopicAttr id mapPath =
     , SA.style "cursor: move"
 
     -- start drag from SVG (bypass global decoder)
-    , SE.on "mousedown" (D.map (Mouse << DownItem topicCls id mapPath) posDecoder)
-    , SE.on "pointerdown" (D.map (Mouse << DownItem topicCls id mapPath) posDecoder)
+    , SE.on "mousedown" (D.map (Mouse << DownOnItem topicCls id mapPath) posDecoder)
+    , SE.on "pointerdown" (D.map (Mouse << DownOnItem topicCls id mapPath) posDecoder)
 
     -- keep model updated while dragging, independent from subs timing
     , SE.on "mousemove" (D.map (Mouse << Move) posDecoder)
@@ -1284,7 +1284,7 @@ dragHandle id mapPath =
         , style "background" "rgba(255,64,0,0.2)"
         , style "cursor" "move"
         , style "z-index" "999"
-        , on "mousedown" (D.map (Mouse << DownItem topicCls id mapPath) posDecoder)
+        , on "mousedown" (D.map (Mouse << DownOnItem topicCls id mapPath) posDecoder)
         , on "mouseenter" (D.succeed (Mouse (Over topicCls id mapPath)))
         , on "mousemove" (D.succeed (Mouse (Over topicCls id mapPath)))
         , on "mouseup" (D.succeed (Mouse Up))
