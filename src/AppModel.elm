@@ -6,11 +6,6 @@ import IconMenu exposing (IconMenuModel, IconMenuMsg)
 import Model exposing (..)
 import Mouse exposing (MouseModel, MouseMsg)
 import Search exposing (SearchModel, SearchMsg)
-import UndoList exposing (UndoList)
-
-
-type alias UndoModel =
-    UndoList Model
 
 
 type alias Model =
@@ -62,21 +57,6 @@ default =
     }
 
 
-resetTransientState : Model -> Model
-resetTransientState model =
-    { model
-      ----- transient -----
-        | selection = default.selection
-        , editState = default.editState
-        , measureText = default.measureText
-
-        -- components
-        , mouse = default.mouse
-        , search = default.search
-        , iconMenu = default.iconMenu
-    }
-
-
 type Msg
     = AddTopic
     | MoveTopicToMap Id MapId Point Id MapPath Point -- start point, random point (for target)
@@ -85,10 +65,6 @@ type Msg
     | Nav NavMsg
     | Hide
     | Delete
-    | Undo
-    | Redo
-    | Import
-    | Export
     | NoOp
       -- components
     | Mouse MouseMsg
