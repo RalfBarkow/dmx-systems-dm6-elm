@@ -1,6 +1,6 @@
 port module Main exposing (..)
 
-import AppModel exposing (..)
+import AppModel as AM
 import Boxing exposing (boxContainer, unboxContainer)
 import Browser
 import Browser.Dom as Dom
@@ -40,7 +40,7 @@ port exportJSON : () -> Cmd msg
 -- MAIN
 
 
-main : Program E.Value UndoModel Msg
+main : Program E.Value AM.UndoModel AM.Msg
 main =
     Browser.document
         { init = init
@@ -50,12 +50,12 @@ main =
         }
 
 
-init : E.Value -> ( UndoModel, Cmd Msg )
+init : E.Value -> ( AM.UndoModel, Cmd AM.Msg )
 init flags =
     ( initModel flags, Cmd.none ) |> reset
 
 
-initModel : E.Value -> Model
+initModel : E.Value -> AM.Model
 initModel flags =
     case flags |> D.decodeValue (D.null True) of
         Ok True ->
@@ -63,7 +63,7 @@ initModel flags =
                 _ =
                     info "init" "localStorage: empty"
             in
-            default
+            AM.default
 
         _ ->
             case flags |> D.decodeValue modelDecoder of
@@ -80,14 +80,14 @@ initModel flags =
                         _ =
                             logError "init" "localStorage" e
                     in
-                    default
+                    AM.default
 
 
 
 -- VIEW
 
 
-view : UndoModel -> Browser.Document Msg
+view : AM.UndoModel -> Browser.Document AM.Msg
 view ({ present } as undoModel) =
     Browser.Document
         "DM6 Elm"
@@ -109,7 +109,7 @@ view ({ present } as undoModel) =
         ]
 
 
-appStyle : List (Attribute Msg)
+appStyle : List (Attribute AM.Msg)
 appStyle =
     [ style "font-family" mainFont
     , style "user-select" "none"
@@ -117,7 +117,7 @@ appStyle =
     ]
 
 
-measureStyle : List (Attribute Msg)
+measureStyle : List (Attribute AM.Msg)
 measureStyle =
     [ style "position" "fixed"
     , style "visibility" "hidden"
@@ -139,88 +139,98 @@ measureStyle =
 -- UPDATE
 
 
-update : Msg -> UndoModel -> ( UndoModel, Cmd Msg )
+update : AM.Msg -> AM.UndoModel -> ( AM.UndoModel, Cmd AM.Msg )
 update msg ({ present } as undoModel) =
     let
         _ =
             case msg of
-                Mouse _ ->
+                AM.Mouse _ ->
                     msg
 
                 _ ->
                     info "update" msg
     in
     case msg of
-        SetFedWikiRaw s ->
+        AM.SetFedWikiRaw s ->
             ( { present | fedWikiRaw = s }, Cmd.none )
                 |> push undoModel
 
-        FedWikiPage raw ->
-            let
-                newPresent =
-                    case D.decodeString FW.decodePage raw of
-                        Ok page ->
-                            FW.pageToModel page present
+        AM.FedWikiPage raw ->
+            case D.decodeString FW.decodePage raw of
+                Ok val ->
+                    let
+                        before =
+                            Dict.size present.items
 
-                        Err _ ->
-                            present
-            in
-            ( { newPresent | fedWikiRaw = raw }, Cmd.none )
-                |> push undoModel
+                        ( m1, cmd ) =
+                            FW.pageToModel val present
 
-        AddTopic ->
+                        after =
+                            Dict.size m1.items
+
+                        _ =
+                            info "fedwiki.import" { before = before, after = after, created = after - before, activeMap = activeMap m1 }
+                    in
+                    ( { m1 | fedWikiRaw = raw }, cmd )
+                        |> push undoModel
+
+                Err _ ->
+                    ( { present | fedWikiRaw = raw }, Cmd.none )
+                        |> push undoModel
+
+        AM.AddTopic ->
             createTopicIn topicDefaultText Nothing [ activeMap present ] present
                 |> storeModel
                 |> push undoModel
 
-        MoveTopicToMap topicId mapId origPos targetId targetMapPath pos ->
+        AM.MoveTopicToMap topicId mapId origPos targetId targetMapPath pos ->
             moveTopicToMap topicId mapId origPos targetId targetMapPath pos present
                 |> storeModel
                 |> push undoModel
 
-        SwitchDisplay displayMode ->
+        AM.SwitchDisplay displayMode ->
             switchDisplay displayMode present
                 |> storeModel
                 |> swap undoModel
 
-        Search searchMsg ->
+        AM.Search searchMsg ->
             updateSearch searchMsg undoModel
 
-        Edit editMsg ->
+        AM.Edit editMsg ->
             updateEdit editMsg undoModel
 
-        IconMenu iconMenuMsg ->
+        AM.IconMenu iconMenuMsg ->
             updateIconMenu iconMenuMsg undoModel
 
-        Mouse mouseMsg ->
+        AM.Mouse mouseMsg ->
             updateMouse mouseMsg undoModel
 
-        Nav navMsg ->
+        AM.Nav navMsg ->
             updateNav navMsg present |> storeModel |> reset
 
-        Hide ->
+        AM.Hide ->
             hide present |> storeModel |> push undoModel
 
-        Delete ->
+        AM.Delete ->
             delete present |> storeModel |> push undoModel
 
-        Undo ->
+        AM.Undo ->
             undo undoModel
 
-        Redo ->
+        AM.Redo ->
             redo undoModel
 
-        Import ->
+        AM.Import ->
             ( present, importJSON () ) |> swap undoModel
 
-        Export ->
+        AM.Export ->
             ( present, exportJSON () ) |> swap undoModel
 
-        NoOp ->
+        AM.NoOp ->
             ( present, Cmd.none ) |> swap undoModel
 
 
-moveTopicToMap : Id -> MapId -> Point -> Id -> MapPath -> Point -> Model -> Model
+moveTopicToMap : Id -> MapId -> Point -> Id -> MapPath -> Point -> AM.Model -> AM.Model
 moveTopicToMap topicId mapId origPos targetId targetMapPath pos model =
     let
         ( newModel, created ) =
@@ -253,7 +263,7 @@ moveTopicToMap topicId mapId origPos targetId targetMapPath pos model =
             model
 
 
-createMapIfNeeded : Id -> Model -> ( Model, Bool )
+createMapIfNeeded : Id -> AM.Model -> ( AM.Model, Bool )
 createMapIfNeeded topicId model =
     if hasMap topicId model.maps then
         ( model, False )
@@ -269,7 +279,7 @@ createMapIfNeeded topicId model =
         )
 
 
-setDisplayModeInAllMaps : Id -> DisplayMode -> Model -> Model
+setDisplayModeInAllMaps : Id -> DisplayMode -> AM.Model -> AM.Model
 setDisplayModeInAllMaps topicId displayMode model =
     model.maps
         |> Dict.foldr
@@ -284,7 +294,7 @@ setDisplayModeInAllMaps topicId displayMode model =
             model
 
 
-switchDisplay : DisplayMode -> Model -> Model
+switchDisplay : DisplayMode -> AM.Model -> AM.Model
 switchDisplay displayMode model =
     (case getSingleSelection model of
         Just ( containerId, mapPath ) ->
@@ -319,7 +329,7 @@ switchDisplay displayMode model =
 -- Text Edit
 
 
-updateEdit : EditMsg -> UndoModel -> ( UndoModel, Cmd Msg )
+updateEdit : EditMsg -> AM.UndoModel -> ( AM.UndoModel, Cmd AM.Msg )
 updateEdit msg ({ present } as undoModel) =
     case msg of
         EditStart ->
@@ -344,7 +354,7 @@ updateEdit msg ({ present } as undoModel) =
                 |> swap undoModel
 
 
-startEdit : Model -> ( Model, Cmd Msg )
+startEdit : AM.Model -> ( AM.Model, Cmd AM.Msg )
 startEdit model =
     let
         newModel =
@@ -360,7 +370,7 @@ startEdit model =
     ( newModel, focus newModel )
 
 
-setDetailDisplayIfMonade : Id -> MapId -> Model -> Model
+setDetailDisplayIfMonade : Id -> MapId -> AM.Model -> AM.Model
 setDetailDisplayIfMonade topicId mapId model =
     model
         |> updateTopicProps topicId
@@ -375,7 +385,7 @@ setDetailDisplayIfMonade topicId mapId model =
             )
 
 
-onTextInput : String -> Model -> Model
+onTextInput : String -> AM.Model -> AM.Model
 onTextInput text model =
     case model.editState of
         ItemEdit topicId _ ->
@@ -387,7 +397,7 @@ onTextInput text model =
             logError "onTextInput" "called when editState is NoEdit" model
 
 
-onTextareaInput : String -> Model -> ( Model, Cmd Msg )
+onTextareaInput : String -> AM.Model -> ( AM.Model, Cmd AM.Msg )
 onTextareaInput text model =
     case model.editState of
         ItemEdit topicId mapId ->
@@ -400,7 +410,7 @@ onTextareaInput text model =
             logError "onTextareaInput" "called when editState is NoEdit" ( model, Cmd.none )
 
 
-measureText : String -> Id -> MapId -> Model -> ( Model, Cmd Msg )
+measureText : String -> Id -> MapId -> AM.Model -> ( AM.Model, Cmd AM.Msg )
 measureText text topicId mapId model =
     ( { model | measureText = text }
     , Dom.getElement "measure"
@@ -408,25 +418,25 @@ measureText text topicId mapId model =
             (\result ->
                 case result of
                     Ok elem ->
-                        Edit
+                        AM.Edit
                             (SetTopicSize topicId
                                 mapId
                                 (Size elem.element.width elem.element.height)
                             )
 
                     Err err ->
-                        logError "measureText" (toString err) NoOp
+                        logError "measureText" (toString err) AM.NoOp
             )
     )
 
 
-endEdit : Model -> Model
+endEdit : AM.Model -> AM.Model
 endEdit model =
     { model | editState = NoEdit }
         |> autoSize
 
 
-focus : Model -> Cmd Msg
+focus : AM.Model -> Cmd AM.Msg
 focus model =
     let
         nodeId =
@@ -442,10 +452,10 @@ focus model =
             (\result ->
                 case result of
                     Ok () ->
-                        NoOp
+                        AM.NoOp
 
                     Err e ->
-                        logError "focus" (toString e) NoOp
+                        logError "focus" (toString e) AM.NoOp
             )
 
 
@@ -453,7 +463,7 @@ focus model =
 --
 
 
-updateNav : NavMsg -> Model -> Model
+updateNav : NavMsg -> AM.Model -> AM.Model
 updateNav navMsg model =
     case navMsg of
         Fullscreen ->
@@ -463,7 +473,7 @@ updateNav navMsg model =
             back model
 
 
-fullscreen : Model -> Model
+fullscreen : AM.Model -> AM.Model
 fullscreen model =
     case getSingleSelection model of
         Just ( topicId, _ ) ->
@@ -477,7 +487,7 @@ fullscreen model =
             model
 
 
-back : Model -> Model
+back : AM.Model -> AM.Model
 back model =
     let
         ( mapId, mapPath, _ ) =
@@ -500,7 +510,7 @@ back model =
         |> autoSize
 
 
-adjustMapRect : MapId -> Float -> Model -> Model
+adjustMapRect : MapId -> Float -> AM.Model -> AM.Model
 adjustMapRect mapId factor model =
     model
         |> updateMapRect mapId
@@ -515,7 +525,7 @@ adjustMapRect mapId factor model =
             )
 
 
-hide : Model -> Model
+hide : AM.Model -> AM.Model
 hide model =
     let
         newModel =
@@ -529,7 +539,7 @@ hide model =
         |> autoSize
 
 
-delete : Model -> Model
+delete : AM.Model -> AM.Model
 delete model =
     let
         newModel =
@@ -548,28 +558,28 @@ delete model =
 -- Undo / Redo
 
 
-undo : UndoModel -> ( UndoModel, Cmd Msg )
+undo : AM.UndoModel -> ( AM.UndoModel, Cmd AM.Msg )
 undo undoModel =
     let
         newUndoModel =
             UndoList.undo undoModel
 
         newModel =
-            resetTransientState newUndoModel.present
+            AM.resetTransientState newUndoModel.present
     in
     newModel
         |> storeModel
         |> swap newUndoModel
 
 
-redo : UndoModel -> ( UndoModel, Cmd Msg )
+redo : AM.UndoModel -> ( AM.UndoModel, Cmd AM.Msg )
 redo undoModel =
     let
         newUndoModel =
             UndoList.redo undoModel
 
         newModel =
-            resetTransientState newUndoModel.present
+            AM.resetTransientState newUndoModel.present
     in
     newModel
         |> storeModel
@@ -580,7 +590,7 @@ redo undoModel =
 -- Map-only element view for embedding (kept for AppEmbed compatibility)
 
 
-viewElementMap : UndoModel -> Html Msg
+viewElementMap : AM.UndoModel -> Html AM.Msg
 viewElementMap undoModel =
     let
         present =

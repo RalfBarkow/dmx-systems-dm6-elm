@@ -20,16 +20,12 @@ decodePage =
 
 
 
--- Old name, adapted: call the new importer and drop the Cmd for purity
+-- Old name, adapted: call the new importer
 
 
-pageToModel : D.Value -> AM.Model -> AM.Model
+pageToModel : D.Value -> AM.Model -> ( AM.Model, Cmd AM.Msg )
 pageToModel val model =
-    let
-        ( m, _ ) =
-            FWI.importPage val model
-    in
-    m
+    FWI.importPage val model
 
 
 
@@ -40,7 +36,11 @@ renderAsMonad : String -> AM.Model -> AM.Model
 renderAsMonad raw model =
     case D.decodeString decodePage raw of
         Ok val ->
-            pageToModel val model
+            let
+                ( m1, _ ) =
+                    pageToModel val model
+            in
+            m1
 
         Err _ ->
             model
