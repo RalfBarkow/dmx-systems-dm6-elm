@@ -27,27 +27,27 @@ port persist : String -> Cmd msg
 
 
 
--- Adapt Main.view (Document) to an element view (Html)
+-- View: embed the active map from the undo model
 
 
-viewElement : AM.Model -> H.Html AM.Msg
+viewElement : AM.UndoModel -> H.Html AM.Msg
 viewElement =
     Main.viewElementMap
 
 
 
--- render only the map area
+-- Program now runs over AM.UndoModel (not plain Model)
 
 
-main : Program E.Value AM.Model AM.Msg
+main : Program E.Value AM.UndoModel AM.Msg
 main =
     Browser.element
         { init = Main.init
         , update = Main.update
         , subscriptions =
-            \m ->
+            \undoModel ->
                 Sub.batch
-                    [ mouseSubs m
+                    [ mouseSubs undoModel
                     , pageJson AM.FedWikiPage
                     ]
         , view = viewElement

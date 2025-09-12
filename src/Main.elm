@@ -7,7 +7,7 @@ import Browser.Dom as Dom
 import Compat.FedWiki as FW
 import Config exposing (..)
 import Dict
-import Html exposing (Attribute, br, div, text)
+import Html exposing (Attribute, Html, br, div, text)
 import Html.Attributes exposing (id, style)
 import IconMenuAPI exposing (updateIconMenu, viewIconMenu)
 import Json.Decode as D
@@ -574,3 +574,18 @@ redo undoModel =
     newModel
         |> storeModel
         |> swap newUndoModel
+
+
+
+-- Map-only element view for embedding (kept for AppEmbed compatibility)
+
+
+viewElementMap : UndoModel -> Html Msg
+viewElementMap undoModel =
+    let
+        present =
+            undoModel.present
+    in
+    div
+        (mouseHoverHandler ++ appStyle)
+        [ viewMap (activeMap present) [] present ]
