@@ -480,14 +480,7 @@ showItem itemId mapId model =
                         { map
                             | items =
                                 Dict.update itemId
-                                    (\maybeItem ->
-                                        case maybeItem of
-                                            Just mapItem ->
-                                                Just { mapItem | hidden = False }
-
-                                            Nothing ->
-                                                Nothing
-                                    )
+                                    (Maybe.map (\mapItem -> { mapItem | hidden = False }))
                                     map.items
                         }
                     )

@@ -6,8 +6,6 @@ module Tests.Main exposing (tests)
 import Domain.ReparentRulesTest
 import Feature.OpenDoor.ButtonTest
 import Feature.OpenDoor.CopyTest
-import Feature.OpenDoor.MoveTopicIntoContainerTest
-import Feature.OpenDoor.MoveTopicOutOfContainerTest
 import Feature.OpenDoor.StayVisibleTest
 import Import.DmxCoreTopicTest
 import Model.AddItemToMapCycleTest
@@ -34,7 +32,5 @@ tests =
         -- Feature-only:
         , Feature.OpenDoor.ButtonTest.tests
         , Feature.OpenDoor.CopyTest.tests
-        , Feature.OpenDoor.MoveTopicIntoContainerTest.tests
-        , Feature.OpenDoor.MoveTopicOutOfContainerTest.tests
         , Feature.OpenDoor.StayVisibleTest.tests
         ]

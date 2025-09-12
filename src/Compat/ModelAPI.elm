@@ -260,3 +260,36 @@ addItemToMap itemId props mapId model =
 
     else
         U.addItemToMap itemId props mapId model
+
+
+
+-- A conservative default for dropping a topic into a map.
+-- Matches your types in src/Model.elm:
+--   MapProps = MapTopic TopicProps
+--   TopicProps = { pos : Point, size : Size, displayMode : DisplayMode }
+
+
+mapPropsForDrop : MapProps
+mapPropsForDrop =
+    MapTopic
+        { displayMode = Container BlackBox
+        , pos = { x = 0, y = 0 }
+        , size = { w = 0, h = 0 }
+        }
+
+
+
+-- Old call-shape expected by legacy tests:
+--   Model -> Id -> MapId -> Model
+
+
+addItemToMapCompat : Model -> Id -> MapId -> Model
+addItemToMapCompat model topicId targetMapId =
+    U.addItemToMap topicId mapPropsForDrop targetMapId model
+
+
+
+-- Re-export under the original name so existing tests do not need edits.
+-- addItemToMap : Model -> Id -> MapId -> Model
+-- addItemToMap =
+--    addItemToMapCompat

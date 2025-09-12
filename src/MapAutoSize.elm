@@ -4,14 +4,8 @@ import AppModel exposing (..)
 import Config exposing (..)
 import Dict
 import Model exposing (..)
-import ModelAPI
-    exposing
-        ( getMap
-        , getSingleSelection
-        , isVisible
-        , setTopicPosByDelta
-        , updateMapRect
-        )
+import ModelAPI exposing (..)
+import Mouse exposing (DragMode(..), DragState(..))
 import Utils exposing (logError)
 
 
@@ -21,46 +15,29 @@ import Utils exposing (logError)
 
 autoSize : Model -> Model
 autoSize model =
-    case getSingleSelection model of
-        Just ( _, mapPath ) ->
-            autoSizeMap mapPath model
-
-        Nothing ->
-            model
+    calcMapRect [ activeMap model ] model |> Tuple.second
 
 
-autoSizeMap : MapPath -> Model -> Model
-autoSizeMap mapPath model =
-    case mapPath of
-        [ _ ] ->
-            model
-
-        mapId :: parentMapId :: mapIds ->
-            model
-                |> calcMapRect mapId parentMapId
-                |> autoSizeMap (parentMapId :: mapIds)
-
-        -- recursion
-        [] ->
-            logError "autoSizeMap" "mapPath is empty!" model
-
-
-{-| Calculates the map's "rect"
+{-| Calculates (recursively) the map's "rect"
 -}
-calcMapRect : MapId -> MapId -> Model -> Model
-calcMapRect mapId parentMapId model =
+calcMapRect : MapPath -> Model -> ( Rectangle, Model )
+calcMapRect mapPath model =
+    let
+        mapId =
+            getMapId mapPath
+    in
     case getMap mapId model.maps of
         Just map ->
             let
-                rect =
+                ( rect, model_ ) =
                     (map.items
                         |> Dict.values
                         |> List.filter isVisible
                         |> List.foldr
-                            (\mapItem rectAcc ->
-                                accumulateSize mapItem mapId rectAcc model
+                            (\mapItem ( rectAcc, modelAcc ) ->
+                                calcItemSize mapItem mapPath rectAcc modelAcc
                             )
-                            (Rectangle 5000 5000 -5000 -5000)
+                            ( Rectangle 5000 5000 -5000 -5000, model )
                      -- x-min y-min x-max y-max
                     )
 
@@ -71,49 +48,103 @@ calcMapRect mapId parentMapId model =
                         (rect.x2 + whiteBoxPadding)
                         (rect.y2 + whiteBoxPadding)
             in
-            storeMapRect mapId newRect map.rect parentMapId model
+            ( newRect
+            , storeMapGeometry mapPath newRect map.rect model_
+            )
 
         Nothing ->
-            model
+            ( Rectangle 0 0 0 0, model )
 
 
-accumulateSize : MapItem -> MapId -> Rectangle -> Model -> Rectangle
-accumulateSize mapItem mapId rectAcc model =
+calcItemSize : MapItem -> MapPath -> Rectangle -> Model -> ( Rectangle, Model )
+calcItemSize mapItem pathToParent rectAcc model =
+    let
+        mapId =
+            getMapId pathToParent
+    in
     case mapItem.props of
         MapTopic { pos, size, displayMode } ->
             case displayMode of
                 Monad LabelOnly ->
-                    topicExtent pos rectAcc
+                    ( topicExtent pos rectAcc, model )
 
                 Monad Detail ->
-                    detailTopicExtent mapItem.id mapId pos size rectAcc model
+                    ( detailTopicExtent mapItem.id mapId pos size rectAcc model, model )
 
                 Container BlackBox ->
-                    topicExtent pos rectAcc
+                    ( topicExtent pos rectAcc, model )
 
                 Container WhiteBox ->
-                    case getMap mapItem.id model.maps of
-                        Just map ->
-                            mapExtent pos map.rect rectAcc
+                    let
+                        ( rect, model_ ) =
+                            calcMapRect (mapItem.id :: pathToParent) model
 
-                        Nothing ->
-                            Rectangle 0 0 0 0
+                        -- recursion
+                    in
+                    ( mapExtent pos rect rectAcc, model_ )
 
-                -- error is already logged
                 Container Unboxed ->
-                    topicExtent pos rectAcc
+                    ( topicExtent pos rectAcc, model )
 
         MapAssoc _ ->
-            rectAcc
+            ( rectAcc, model )
 
 
-{-| Store the map's "newRect" and, based on its change, calculate and stores the map's "pos"
+{-| Stores the map's "newRect" and, based on its change, calculates and stores the map's "pos"
 adjustmennt ("delta")
 -}
-storeMapRect : MapId -> Rectangle -> Rectangle -> MapId -> Model -> Model
-storeMapRect mapId newRect oldRect parentMapId model =
+storeMapGeometry : MapPath -> Rectangle -> Rectangle -> Model -> Model
+storeMapGeometry mapPath newRect oldRect model =
+    case mapPath of
+        mapId :: parentMapId :: _ ->
+            let
+                ( isDragInProgress, isOnDragPath, isMapInDragPath ) =
+                    case model.mouse.dragState of
+                        Drag DragTopic _ dragPath _ _ _ ->
+                            ( True
+                            , (dragPath |> List.drop (List.length dragPath - List.length mapPath)) == mapPath
+                            , List.member mapId dragPath
+                            )
+
+                        _ ->
+                            ( False, False, False )
+            in
+            if isDragInProgress then
+                if isOnDragPath then
+                    model
+                        |> storeMapRect mapId newRect
+                        |> adjustMapPos mapId parentMapId newRect oldRect
+                    -- if maps are revealed more than once only those within the drag-path
+                    -- get the position adjustment, the other map's positions remain stable
+
+                else if isMapInDragPath then
+                    model
+                    -- do nothing, postpone map's geometry update until reaching drag-path,
+                    -- otherwise, when reaching drag-path, the map's rect would be updated
+                    -- already and position adjustment will calculate 0
+
+                else
+                    model |> storeMapRect mapId newRect
+
+            else
+                model |> storeMapRect mapId newRect
+
+        [ _ ] ->
+            model
+
+        -- do nothing, for the fullscreen map there is no geometry update
+        [] ->
+            logError "storeMapGeometry" "mapPath is empty!" model
+
+
+storeMapRect : MapId -> Rectangle -> Model -> Model
+storeMapRect mapId newRect model =
+    model |> updateMapRect mapId (\_ -> newRect)
+
+
+adjustMapPos : MapId -> MapId -> Rectangle -> Rectangle -> Model -> Model
+adjustMapPos mapId parentMapId newRect oldRect model =
     model
-        |> updateMapRect mapId (\_ -> newRect)
         |> setTopicPosByDelta mapId
             parentMapId
             (Point

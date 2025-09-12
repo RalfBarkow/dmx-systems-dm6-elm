@@ -4,11 +4,11 @@ import Model exposing (Class, Id, MapPath, Point)
 import Time
 
 
-type alias MouseModel =
+type alias Model =
     { dragState : DragState }
 
 
-init : MouseModel
+init : Model
 init =
     { dragState = NoDrag }
 
@@ -27,7 +27,7 @@ type DragMode
     | DrawAssoc
 
 
-type MouseMsg
+type Msg
     = Down -- mouse down somewhere
     | DownOnItem Class Id MapPath Point -- mouse down on an item where a drag can be engaged
     | Move Point

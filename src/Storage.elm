@@ -1,4 +1,4 @@
-port module Storage exposing (modelDecoder, storeModel, storeModelWith)
+port module Storage exposing (exportJSON, importJSON, modelDecoder, store, storeWith)
 
 import AppModel exposing (..)
 import Dict exposing (Dict)
@@ -12,29 +12,36 @@ import Model exposing (..)
 -- PORTS
 
 
-port store : E.Value -> Cmd msg
+port storeModel : E.Value -> Cmd msg
+
+
+port importJSON : () -> Cmd msg
+
+
+port exportJSON : () -> Cmd msg
 
 
 
--- ENCODE/DECODE MODEL <-> JS VALUE (for storage)
+--
 
 
-storeModel : Model -> ( Model, Cmd Msg )
-storeModel model =
-    ( model, encodeModel model |> store )
+store : Model -> ( Model, Cmd Msg )
+store model =
+    ( model, encodeModel model |> storeModel )
 
 
-storeModelWith : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
-storeModelWith ( model, cmd ) =
+storeWith : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+storeWith ( model, cmd ) =
     ( model
     , Cmd.batch
         [ cmd
-        , encodeModel model |> store
+        , encodeModel model |> storeModel
         ]
     )
 
 
 
+-- ENCODE/DECODE MODEL <-> JS VALUE
 -- Encode
 
 
@@ -150,14 +157,14 @@ encodeDisplayName displayMode =
 -- Decode
 
 
-fullModelDecoder : D.Decoder Model
-fullModelDecoder =
+modelDecoder : D.Decoder Model
+modelDecoder =
     D.succeed Model
         |> required "items" (D.list itemDecoder |> D.andThen tupleToDictDecoder)
         |> required "maps" (D.list mapDecoder |> D.andThen toDictDecoder)
         |> required "mapPath" (D.list D.int)
         |> required "nextId" D.int
-        ----- transient -----
+        -- transient (not persisted)
         |> hardcoded default.selection
         |> hardcoded default.editState
         |> hardcoded default.measureText
@@ -165,18 +172,6 @@ fullModelDecoder =
         |> hardcoded default.mouse
         |> hardcoded default.search
         |> hardcoded default.iconMenu
-        -- display (added field in AppModel.Model)
-        |> hardcoded default.display
-        -- fedwiki (NEW)
-        |> hardcoded default.fedWikiRaw
-
-
-modelDecoder : D.Decoder AppModel.Model
-modelDecoder =
-    D.oneOf
-        [ fullModelDecoder
-        , D.succeed default
-        ]
 
 
 itemDecoder : D.Decoder ( Id, ItemInfo )

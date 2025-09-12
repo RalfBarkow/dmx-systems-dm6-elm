@@ -7,7 +7,7 @@ import Config exposing (date, footerFontSize, homeMapName, mainFont, toolbarFont
 import Html exposing (Attribute, Html, a, button, div, input, label, span, text)
 import Html.Attributes exposing (checked, disabled, href, name, style, type_)
 import Html.Events exposing (onClick)
-import IconMenu exposing (IconMenuMsg(..))
+import IconMenu
 import IconMenuAPI exposing (viewIcon)
 import Model
     exposing
@@ -49,7 +49,7 @@ viewToolbar ({ present } as undoModel) =
         , viewSearchInput present
         , viewToolbarButton "Add Topic" AddTopic always undoModel
         , viewToolbarButton "Edit" (Edit EditStart) hasSelection undoModel
-        , viewToolbarButton "Choose Icon" (IconMenu Open) hasSelection undoModel
+        , viewToolbarButton "Choose Icon" (IconMenu IconMenu.Open) hasSelection undoModel
         , viewMonadDisplay present
         , viewContainerDisplay present
         , viewToolbarButton "Hide" Hide hasSelection undoModel
@@ -171,7 +171,7 @@ hasFuture undoModel =
 {-| isEnabled predicate
 -}
 always : UndoModel -> Bool
-always undoModel =
+always _ =
     True
 
 

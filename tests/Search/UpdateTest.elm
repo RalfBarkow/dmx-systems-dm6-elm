@@ -3,7 +3,7 @@ module Search.UpdateTest exposing (tests)
 import Compat.TestDefault exposing (defaultModel)
 import Compat.TestUtil exposing (asUndo, present)
 import Expect
-import Search exposing (SearchMsg(..))
+import Search exposing (..)
 import SearchAPI exposing (updateSearch)
 import Test exposing (..)
 

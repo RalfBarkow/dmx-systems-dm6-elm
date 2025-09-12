@@ -19,7 +19,7 @@ version =
 
 date : String
 date =
-    "Sep 11, 2025"
+    "Sep 12, 2025"
 
 
 newTopicPos : Point

@@ -1,11 +1,12 @@
 module AppModel exposing (..)
 
-import Compat.Display as Disp
+-- components
+
 import Dict
-import IconMenu exposing (IconMenuModel, IconMenuMsg)
+import IconMenu
 import Model exposing (..)
-import Mouse exposing (MouseModel, MouseMsg)
-import Search exposing (SearchModel, SearchMsg)
+import Mouse
+import Search
 import UndoList exposing (UndoList)
 
 
@@ -25,13 +26,9 @@ type alias Model =
     , measureText : String
 
     -- components
-    , mouse : MouseModel
-    , search : SearchModel
-    , iconMenu : IconMenuModel
-
-    -- display + fedwiki
-    , display : Disp.DisplayConfig
-    , fedWikiRaw : String
+    , mouse : Mouse.Model
+    , search : Search.Model
+    , iconMenu : IconMenu.Model
     }
 
 
@@ -55,10 +52,6 @@ default =
     , mouse = Mouse.init
     , search = Search.init
     , iconMenu = IconMenu.init
-
-    -- display + fedwiki
-    , display = Disp.default
-    , fedWikiRaw = ""
     }
 
 
@@ -91,9 +84,6 @@ type Msg
     | Export
     | NoOp
       -- components
-    | Mouse MouseMsg
-    | Search SearchMsg
-    | IconMenu IconMenuMsg
-      -- Federated Wiki
-    | SetFedWikiRaw String
-    | FedWikiPage String
+    | Mouse Mouse.Msg
+    | Search Search.Msg
+    | IconMenu IconMenu.Msg

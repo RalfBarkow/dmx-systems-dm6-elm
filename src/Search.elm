@@ -3,14 +3,14 @@ module Search exposing (..)
 import Model exposing (Id)
 
 
-type alias SearchModel =
+type alias Model =
     { text : String
     , result : List Id -- topic Ids
     , menu : ResultMenu
     }
 
 
-init : SearchModel
+init : Model
 init =
     { text = ""
     , result = []
@@ -23,7 +23,7 @@ type ResultMenu
     | Closed
 
 
-type SearchMsg
+type Msg
     = Input String
     | FocusInput
     | HoverItem Id
