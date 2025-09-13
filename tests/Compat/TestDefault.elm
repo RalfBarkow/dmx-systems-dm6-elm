@@ -1,4 +1,4 @@
-module Compat.TestDefault exposing (defaultModel, tests)
+module Compat.TestDefault exposing (defaultModel, suite)
 
 import AppMain as AdapterMain
 import AppModel as AM
@@ -8,30 +8,50 @@ import Json.Encode as E
 import Test exposing (..)
 
 
-
--- Expose a plain AppModel.Model (not the undo wrapper)
-
-
 defaultModel : AM.Model
 defaultModel =
-    AdapterMain.init E.null
-        |> Tuple.first
-        |> .present
+    let
+        ( undo, _ ) =
+            AdapterMain.init E.null
+    in
+    undo.present
 
 
-tests : Test
-tests =
-    describe "Compat.TestDefault"
-        [ test "default model basics" <|
+
+-- Sanity checks for the adapter that accepts Json.Value (E.null → cold boot)
+
+
+suite : Test
+suite =
+    describe "Compat default boot via adapter"
+        [ test "init with E.null cold-boots to default model" <|
             \_ ->
                 let
+                    ( undo, _ ) =
+                        AdapterMain.init E.null
+
                     m =
-                        defaultModel
+                        undo.present
                 in
-                Expect.all
-                    [ \_ -> Expect.equal [ 0 ] m.mapPath
-                    , \_ -> Expect.equal True (Dict.member 0 m.maps)
-                    , \_ -> Expect.equal 1 m.nextId
-                    ]
-                    ()
+                Expect.equal [ 0 ] m.mapPath
+        , test "home map (0) exists" <|
+            \_ ->
+                let
+                    ( undo, _ ) =
+                        AdapterMain.init E.null
+
+                    m =
+                        undo.present
+                in
+                Expect.equal True (Dict.member 0 m.maps)
+        , test "nextId starts at 1" <|
+            \_ ->
+                let
+                    ( undo, _ ) =
+                        AdapterMain.init E.null
+
+                    m =
+                        undo.present
+                in
+                Expect.equal 1 m.nextId
         ]
