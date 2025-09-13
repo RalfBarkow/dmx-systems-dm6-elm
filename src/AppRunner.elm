@@ -3,13 +3,16 @@ module AppRunner exposing (init, onFedWikiPage, subscriptions, update, view)
 import AppModel as AM
 import Browser
 import Compat.FedWiki as CFW
+import Config exposing (mainFont)
 import Dict
-import Html as H
+import Html as H exposing (Attribute, Html, div)
+import Html.Attributes as HA exposing (style)
 import Json.Decode as D
 import Json.Encode as E
 import Main
+import MapRenderer exposing (viewMap)
 import ModelAPI exposing (activeMap)
-import MouseAPI exposing (mouseSubs)
+import MouseAPI exposing (mouseHoverHandler, mouseSubs)
 import Platform.Sub as Sub
 import Utils exposing (info)
 
@@ -29,9 +32,31 @@ subscriptions =
     mouseSubs
 
 
+
+-- Map-only element view (moved here from Main)
+
+
 view : AM.UndoModel -> H.Html AM.Msg
-view =
-    Main.viewElementMap
+view undoModel =
+    let
+        present =
+            undoModel.present
+    in
+    div
+        (mouseHoverHandler ++ appStyle)
+        [ viewMap (activeMap present) [] present ]
+
+
+
+-- Local copy of the minimal app styles needed for the embed view
+
+
+appStyle : List (H.Attribute AM.Msg)
+appStyle =
+    [ HA.style "font-family" mainFont
+    , HA.style "user-select" "none"
+    , HA.style "line-height" "1.4"
+    ]
 
 
 

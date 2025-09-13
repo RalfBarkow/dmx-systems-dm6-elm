@@ -584,18 +584,3 @@ redo undoModel =
     newModel
         |> storeModel
         |> swap newUndoModel
-
-
-
--- Map-only element view for embedding (kept for AppEmbed compatibility)
-
-
-viewElementMap : AM.UndoModel -> Html AM.Msg
-viewElementMap undoModel =
-    let
-        present =
-            undoModel.present
-    in
-    div
-        (mouseHoverHandler ++ appStyle)
-        [ viewMap (activeMap present) [] present ]
