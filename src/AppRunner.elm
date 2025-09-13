@@ -1,4 +1,4 @@
-port module AppRunner exposing (main)
+module AppRunner exposing (init, onFedWikiPage, subscriptions, update, view)
 
 import AppModel as AM
 import Browser
@@ -8,99 +8,73 @@ import Html as H
 import Json.Decode as D
 import Json.Encode as E
 import Main
-import ModelAPI exposing (push)
+import ModelAPI exposing (activeMap)
 import MouseAPI exposing (mouseSubs)
-import Platform.Cmd as Cmd
 import Platform.Sub as Sub
+import Utils exposing (info)
+
+
+init : E.Value -> ( AM.UndoModel, Cmd AM.Msg )
+init =
+    Main.init
+
+
+update : AM.Msg -> AM.UndoModel -> ( AM.UndoModel, Cmd AM.Msg )
+update =
+    Main.update
+
+
+subscriptions : AM.UndoModel -> Sub.Sub AM.Msg
+subscriptions =
+    mouseSubs
+
+
+view : AM.UndoModel -> H.Html AM.Msg
+view =
+    Main.viewElementMap
 
 
 
--- Ports you need here (don’t put them in Main)
+-- Called by AppEmbed when the frame sends the current page’s JSON
 
 
-port pageJson : (String -> msg) -> Sub msg
-
-
-port importJSON : () -> Cmd msg
-
-
-port exportJSON : () -> Cmd msg
-
-
-
--- Wrap upstream messages
-
-
-type Msg
-    = Up AM.Msg
-    | PageJson String
-
-
-type alias Model =
-    AM.UndoModel
-
-
-init : E.Value -> ( AM.UndoModel, Cmd Msg )
-init flags =
-    let
-        ( u, c ) =
-            Main.init flags
-    in
-    ( u, Cmd.map Up c )
-
-
-subscriptions : AM.UndoModel -> Sub Msg
-subscriptions m =
-    Sub.batch
-        [ Sub.map Up (mouseSubs m)
-        , pageJson PageJson
-        ]
-
-
-update : Msg -> AM.UndoModel -> ( AM.UndoModel, Cmd Msg )
-update msg undoModel =
-    case msg of
-        Up sub ->
+onFedWikiPage : String -> AM.UndoModel -> ( AM.UndoModel, Cmd msg )
+onFedWikiPage raw undoModel =
+    case D.decodeString CFW.decodePage raw of
+        Ok val ->
             let
-                ( next, cmd ) =
-                    Main.update sub undoModel
+                before =
+                    Dict.size undoModel.present.items
+
+                ( m1, cmd ) =
+                    CFW.pageToModel val undoModel.present
+
+                after =
+                    Dict.size m1.items
+
+                _ =
+                    info "fedwiki.import"
+                        { before = before
+                        , after = after
+                        , created = after - before
+                        , activeMap = activeMap m1
+                        }
+
+                present1 =
+                    { m1 | fedWikiRaw = raw }
             in
-            ( next, Cmd.map Up cmd )
+            ( { undoModel | present = present1 }
+            , Cmd.none
+            )
 
-        PageJson raw ->
-            case D.decodeString CFW.decodePage raw of
-                Ok val ->
-                    let
-                        before =
-                            Dict.size undoModel.present.items
+        Err _ ->
+            let
+                present0 =
+                    undoModel.present
 
-                        ( m1, cmdImport ) =
-                            CFW.pageToModel val undoModel.present
-
-                        after =
-                            Dict.size m1.items
-
-                        -- push expects (AM.Model, Cmd AM.Msg)
-                        ( u1, cmdPushed ) =
-                            push undoModel ( { m1 | fedWikiRaw = raw }, cmdImport )
-                    in
-                    ( u1, Cmd.map Up cmdPushed )
-
-                Err _ ->
-                    ( undoModel, Cmd.none )
-
-
-view : AM.UndoModel -> H.Html Msg
-view u =
-    -- use Main’s map-only view to keep the frame clean
-    H.map Up (Main.viewElementMap u)
-
-
-main : Program E.Value AM.UndoModel Msg
-main =
-    Browser.element
-        { init = init
-        , update = update
-        , subscriptions = subscriptions
-        , view = view
-        }
+                present1 =
+                    { present0 | fedWikiRaw = raw }
+            in
+            ( { undoModel | present = present1 }
+            , Cmd.none
+            )
