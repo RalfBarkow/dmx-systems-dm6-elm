@@ -1,6 +1,4 @@
-module AppModel exposing (..)
-
--- components
+module AppModel exposing (Model, Msg(..), UndoModel)
 
 import Dict
 import IconMenu

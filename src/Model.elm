@@ -181,3 +181,19 @@ type EditMsg
 type NavMsg
     = Fullscreen
     | Back
+
+
+
+-- COMPAT: defaults for Main.elm & Storage.elm in the FedWiki embed
+
+
+default =
+    Debug.todo "embed: Model.default is a placeholder; not used in FedWiki embed"
+
+
+
+-- In the embed we don’t keep any transient UI caches to reset; identity is fine.
+
+
+resetTransientState m =
+    m

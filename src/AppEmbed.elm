@@ -1,94 +1,78 @@
 port module AppEmbed exposing (main)
 
 import AppModel as AM
-import AppRunner as R
+import AppRunner as App exposing (Msg(..), UndoModel)
 import Browser
-import Html as H
+import Compat.FedWiki as CFW
+import Html exposing (Html)
+import Json.Decode as D
 import Json.Encode as E
-import Platform.Sub as Sub
 
 
 
--- Ports exposed to JS (frame)
+-- Live page JSON from the FedWiki frame (stringified page object)
 
 
-port pageJson : (String -> msg) -> Sub.Sub msg
+port pageJson : (String -> msg) -> Sub msg
 
 
-port importJSON : () -> Cmd msg
-
-
-port exportJSON : () -> Cmd msg
-
-
-port persist : String -> Cmd msg
-
-
-
--- AppEmbed wraps AppRunner’s Msg so we can map Cmd/Sub safely
-
-
-type Msg
-    = Up AM.Msg
-    | FedWikiPage String
-    | NoOp
-
-
-main : Program E.Value AM.UndoModel Msg
-main =
-    Browser.element
-        { init = \flags -> mapInit R.init flags
-        , update = update
-        , subscriptions = subscriptions
-        , view = \m -> H.map Up (R.view m) -- R.view already returns Html Msg
-        }
-
-
-subscriptions : AM.UndoModel -> Sub.Sub Msg
-subscriptions m =
-    Sub.batch
-        [ Sub.map Up (R.subscriptions m)
-        , pageJson FedWikiPage
+storedDecoder : D.Decoder String
+storedDecoder =
+    D.oneOf
+        [ D.field "stored" D.string -- your cold-boot.html passes this
+        , D.field "pageJson" D.string -- future-proof alias
+        , D.succeed "{}"
         ]
 
 
-update : Msg -> AM.UndoModel -> ( AM.UndoModel, Cmd Msg )
-update msg model =
-    case msg of
-        Up inner ->
-            mapUpdate R.update inner model
-
-        FedWikiPage raw ->
-            R.onFedWikiPage raw model
-
-        NoOp ->
-            ( model, Cmd.none )
-
-
-
--- Tiny helpers to map init/update tuples between Msg types
-
-
-mapInit :
-    (E.Value -> ( AM.UndoModel, Cmd AM.Msg ))
-    -> E.Value
-    -> ( AM.UndoModel, Cmd Msg )
-mapInit init flags =
+init : E.Value -> ( App.UndoModel, Cmd App.Msg )
+init flagsValue =
     let
-        ( m, cmd ) =
-            init flags
+        ( undo0, cmd0 ) =
+            App.init flagsValue
+
+        raw =
+            D.decodeValue storedDecoder flagsValue
+                |> Result.withDefault "{}"
+
+        undo1 =
+            case D.decodeString CFW.decodePage raw of
+                Ok val ->
+                    let
+                        ( model1, _ ) =
+                            CFW.pageToModel val undo0.present
+                    in
+                    { undo0 | present = model1 }
+
+                Err _ ->
+                    undo0
     in
-    ( m, Cmd.map Up cmd )
+    ( undo1, cmd0 )
 
 
-mapUpdate :
-    (AM.Msg -> AM.UndoModel -> ( AM.UndoModel, Cmd AM.Msg ))
-    -> AM.Msg
-    -> AM.UndoModel
-    -> ( AM.UndoModel, Cmd Msg )
-mapUpdate f inner m =
-    let
-        ( next, cmd ) =
-            f inner m
-    in
-    ( next, Cmd.map Up cmd )
+update : App.Msg -> App.UndoModel -> ( App.UndoModel, Cmd App.Msg )
+update =
+    App.update
+
+
+view : App.UndoModel -> Html App.Msg
+view =
+    App.view
+
+
+subscriptions : App.UndoModel -> Sub App.Msg
+subscriptions undo =
+    Sub.batch
+        [ App.subscriptions undo -- Sub App.Msg
+        , pageJson FedWikiPage -- Sub App.Msg
+        ]
+
+
+main : Program E.Value App.UndoModel App.Msg
+main =
+    Browser.element
+        { init = init
+        , view = view
+        , update = update
+        , subscriptions = subscriptions
+        }

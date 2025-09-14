@@ -1,7 +1,14 @@
-module AppRunner exposing (init, onFedWikiPage, subscriptions, update, view)
+module AppRunner exposing
+    ( Msg(..)
+    , UndoModel
+    , init
+    , onFedWikiPage
+    , subscriptions
+    , update
+    , view
+    )
 
-import AppModel as AM
-import Browser
+import AppModel as AM exposing (UndoModel)
 import Compat.FedWiki as CFW
 import Config exposing (mainFont)
 import Dict
@@ -14,37 +21,77 @@ import MapRenderer exposing (viewMap)
 import ModelAPI exposing (activeMap)
 import MouseAPI exposing (mouseHoverHandler, mouseSubs)
 import Platform.Sub as Sub
+import Storage
 import Utils exposing (info)
 
 
-init : E.Value -> ( AM.UndoModel, Cmd AM.Msg )
-init =
-    Main.init
+
+-- local alias so we can expose UndoModel from this module
 
 
-update : AM.Msg -> AM.UndoModel -> ( AM.UndoModel, Cmd AM.Msg )
-update =
-    Main.update
+type alias UndoModel =
+    AM.UndoModel
 
 
-subscriptions : AM.UndoModel -> Sub.Sub AM.Msg
-subscriptions =
-    mouseSubs
+
+-- Our wrapper messages
+
+
+type Msg
+    = Up AM.Msg
+    | FedWikiPage String
+
+
+init : E.Value -> ( AM.UndoModel, Cmd Msg )
+init flags =
+    let
+        ( undo0, cmd0 ) =
+            Main.init flags
+    in
+    ( undo0, Cmd.map Up cmd0 )
+
+
+
+-- WRAP update: handle FedWikiPage here, delegate everything else.
+
+
+update : Msg -> AM.UndoModel -> ( AM.UndoModel, Cmd Msg )
+update msg undo0 =
+    case msg of
+        FedWikiPage raw ->
+            onFedWikiPage raw undo0
+
+        Up m ->
+            let
+                ( undo1, cmd1 ) =
+                    Main.update m undo0
+            in
+            ( undo1, Cmd.map Up cmd1 )
+
+
+subscriptions : AM.UndoModel -> Sub.Sub Msg
+subscriptions undo =
+    -- or: mouseSubs undo |> Sub.map Up
+    Sub.map Up (mouseSubs undo)
 
 
 
 -- Map-only element view (moved here from Main)
 
 
-view : AM.UndoModel -> H.Html AM.Msg
+view : AM.UndoModel -> H.Html Msg
 view undoModel =
     let
         present =
             undoModel.present
+
+        base : H.Html AM.Msg
+        base =
+            div
+                (mouseHoverHandler ++ appStyle)
+                [ viewMap (activeMap present) [] present ]
     in
-    div
-        (mouseHoverHandler ++ appStyle)
-        [ viewMap (activeMap present) [] present ]
+    H.map Up base
 
 
 
