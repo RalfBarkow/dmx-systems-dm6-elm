@@ -27,27 +27,8 @@ storedDecoder =
 
 init : E.Value -> ( App.UndoModel, Cmd App.Msg )
 init flagsValue =
-    let
-        ( undo0, cmd0 ) =
-            App.init flagsValue
-
-        raw =
-            D.decodeValue storedDecoder flagsValue
-                |> Result.withDefault "{}"
-
-        undo1 =
-            case D.decodeString CFW.decodePage raw of
-                Ok val ->
-                    let
-                        ( model1, _ ) =
-                            CFW.pageToModel val undo0.present
-                    in
-                    { undo0 | present = model1 }
-
-                Err _ ->
-                    undo0
-    in
-    ( undo1, cmd0 )
+    -- just delegate to App.init, do NOT decode/import flags.stored here
+    App.init flagsValue
 
 
 update : App.Msg -> App.UndoModel -> ( App.UndoModel, Cmd App.Msg )

@@ -89,9 +89,8 @@ importPage value model0 =
     case D.decodeValue pageDecoder value of
         Err _ ->
             let
-                -- createTopic : String -> Maybe IconName -> AM.Model -> (AM.Model, Id)
-                ( model1, topicId ) =
-                    CAPI.createTopic "empty" Nothing model0
+                ( model1, _ ) =
+                    CAPI.createTopicAndAddToMap "empty" Nothing 0 model0
             in
             ( model1, Cmd.none )
 
@@ -108,7 +107,7 @@ importPage value model0 =
                                     t
                            )
 
-                ( model1, topicId ) =
-                    CAPI.createTopic normalizedTitle Nothing model0
+                ( model1, _ ) =
+                    CAPI.createTopicAndAddToMap normalizedTitle Nothing 0 model0
             in
             ( model1, Cmd.none )

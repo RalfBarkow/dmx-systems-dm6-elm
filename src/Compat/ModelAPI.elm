@@ -93,16 +93,9 @@ createAssocAndAddToMap itemType role1 player1 role2 player2 mapId model0 =
     ( model2, assocId )
 
 
-{-| Drop-in replacement for upstream createTopic:
-create the Item AND ensure its per-topic map exists.
--}
 createTopic : String -> Maybe IconName -> Model -> ( Model, Id )
-createTopic title maybeIcon model0 =
-    let
-        ( model1, topicId ) =
-            U.createTopic title maybeIcon model0
-    in
-    ( ensureMap topicId model1, topicId )
+createTopic =
+    U.createTopic
 
 
 getMapItemById : Id -> MapId -> Maps -> Maybe MapItem
@@ -250,16 +243,11 @@ wouldCreateAncestralCycle model { parent, child } =
     dfs [] child
 
 
-{-| Guarded add: refuse self-containment & ancestry cycles,
-AND ensure both the destination map and the topic’s own nested map exist.
-This prevents "illegal Map ID" during upstream updateMaps.
+{-| Guarded add: ensure destination map only; force monad display
 -}
 addItemToMap : Id -> MapProps -> MapId -> Model -> Model
 addItemToMap itemId props mapId model0 =
-    if itemId == mapId then
-        model0
-
-    else if wouldCreateAncestralCycle model0 { parent = mapId, child = itemId } then
+    if itemId == mapId || wouldCreateAncestralCycle model0 { parent = mapId, child = itemId } then
         model0
 
     else
@@ -269,11 +257,9 @@ addItemToMap itemId props mapId model0 =
                     MapTopic tp ->
                         MapTopic { tp | displayMode = Monad LabelOnly }
 
-                    -- 🔴 force circles
-                    _ ->
-                        props
+                    other ->
+                        other
         in
         model0
             |> ensureMap mapId
-            |> ensureMap itemId
             |> U.addItemToMap itemId props1 mapId
