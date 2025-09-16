@@ -23,6 +23,51 @@ import Utils exposing (info)
 
 
 
+-- --- FedWiki peek decoders & helpers (diagnostics only) ----------------------
+
+
+type alias FWStoryLite =
+    { id : String
+    , typ : String
+    }
+
+
+type alias FWPageLite =
+    { title : String
+    , story : List FWStoryLite
+    }
+
+
+fwStoryLiteDecoder : D.Decoder FWStoryLite
+fwStoryLiteDecoder =
+    D.map2 FWStoryLite
+        (D.field "id" D.string)
+        (D.field "type" D.string)
+
+
+fwPageLiteDecoder : D.Decoder FWPageLite
+fwPageLiteDecoder =
+    D.map2 FWPageLite
+        (D.field "title" D.string)
+        (D.field "story" (D.list fwStoryLiteDecoder))
+
+
+typeHistogram : List FWStoryLite -> Dict.Dict String Int
+typeHistogram items =
+    let
+        bump : String -> Dict.Dict String Int -> Dict.Dict String Int
+        bump k =
+            Dict.update k (\mi -> Just <| Maybe.withDefault 0 mi + 1)
+    in
+    List.foldl (\s acc -> bump s.typ acc) Dict.empty items
+
+
+firstN : Int -> List FWStoryLite -> List FWStoryLite
+firstN n xs =
+    xs |> List.take n
+
+
+
 -- local alias so we can expose UndoModel from this module
 
 
@@ -95,29 +140,46 @@ update msg undo =
 
         FedWikiPage rawJson ->
             let
-                itemsBefore =
-                    Dict.size undo.present.items
+                -- Peek the payload BEFORE Compat import
+                _ =
+                    case D.decodeString fwPageLiteDecoder rawJson of
+                        Ok lite ->
+                            let
+                                total =
+                                    List.length lite.story
 
-                mapsBefore =
-                    Dict.size undo.present.maps
+                                hist =
+                                    typeHistogram lite.story
 
-                activeBefore =
-                    activeMap undo.present
+                                sample =
+                                    firstN 6 lite.story
+
+                                _ =
+                                    info "fedwiki.story.stats"
+                                        { title = lite.title
+                                        , total = total
+                                        , histogram = hist
+                                        , sample = List.map (\s -> { id = s.id, typ = s.typ }) sample
+                                        }
+                            in
+                            ()
+
+                        Err err ->
+                            let
+                                _ =
+                                    info "fedwiki.story.decode.err"
+                                        { error = Debug.toString err
+                                        , rawLen = String.length rawJson
+                                        }
+                            in
+                            ()
             in
+            -- Proceed with your existing Compat import
             case D.decodeString CFW.decodePage rawJson of
                 Ok val ->
                     let
                         ( model1, _ ) =
                             CFW.pageToModel val undo.present
-
-                        itemsAfter =
-                            Dict.size model1.items
-
-                        mapsAfter =
-                            Dict.size model1.maps
-
-                        activeAfter =
-                            activeMap model1
 
                         _ =
                             info "fedwiki.decode.ok"
@@ -125,14 +187,12 @@ update msg undo =
 
                         _ =
                             info "fedwiki.import"
-                                { itemsBefore = itemsBefore
-                                , itemsAfter = itemsAfter
-                                , itemsCreated = itemsAfter - itemsBefore
-                                , mapsBefore = mapsBefore
-                                , mapsAfter = mapsAfter
-                                , mapsDelta = mapsAfter - mapsBefore
-                                , activeBefore = activeBefore
-                                , activeAfter = activeAfter
+                                { itemsBefore = Dict.size undo.present.items
+                                , itemsAfter = Dict.size model1.items
+                                , itemsCreated = Dict.size model1.items - Dict.size undo.present.items
+                                , mapsBefore = Dict.size undo.present.maps
+                                , mapsAfter = Dict.size model1.maps
+                                , mapsDelta = Dict.size model1.maps - Dict.size undo.present.maps
                                 }
                     in
                     ( { undo | present = { model1 | fedWikiRaw = rawJson } }
