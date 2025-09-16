@@ -1,44 +1,86 @@
-port module Storage exposing (modelDecoder, storeModel, storeModelWith)
+port module Storage exposing
+    ( exportJSON
+    , importJSON
+    , modelDecoder
+    , store
+      -- keep both APIs so all callers work
+    , storeModel
+    , storeModelWith
+    , storeWith
+    )
 
-import AppModel exposing (..)
+-- Model, Item, Map, etc.
+
+import AppModel as AM
+import Compat.Display as Display
+import Defaults exposing (editState, iconMenu, mouse, search)
 import Dict exposing (Dict)
 import Json.Decode as D
 import Json.Decode.Pipeline exposing (hardcoded, required)
 import Json.Encode as E
-import Model exposing (..)
+import Model as M exposing (..)
 
 
 
--- PORTS
+-- keep using M.Item, M.Map, etc.
+-- JS sink
 
 
-port store : E.Value -> Cmd msg
+port persist : E.Value -> Cmd msg
 
 
 
--- ENCODE/DECODE MODEL <-> JS VALUE (for storage)
+-- ========= SAVE (pipeline-friendly, as your callers expect) =========
 
 
-storeModel : Model -> ( Model, Cmd Msg )
+storeModel : AM.Model -> ( AM.Model, Cmd AM.Msg )
 storeModel model =
-    ( model, encodeModel model |> store )
+    ( model, encodeModel model |> persist )
 
 
-storeModelWith : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+storeModelWith : ( AM.Model, Cmd AM.Msg ) -> ( AM.Model, Cmd AM.Msg )
 storeModelWith ( model, cmd ) =
     ( model
     , Cmd.batch
         [ cmd
-        , encodeModel model |> store
+        , encodeModel model |> persist
         ]
     )
 
 
 
--- Encode
+-- Back-compat aliases some modules import
 
 
-encodeModel : Model -> E.Value
+store : AM.Model -> ( AM.Model, Cmd AM.Msg )
+store =
+    storeModel
+
+
+storeWith : ( AM.Model, Cmd AM.Msg ) -> ( AM.Model, Cmd AM.Msg )
+storeWith =
+    storeModelWith
+
+
+
+-- ========= IMPORT/EXPORT (no-ops in embed) =========
+
+
+importJSON : () -> Cmd AM.Msg
+importJSON _ =
+    Cmd.none
+
+
+exportJSON : () -> Cmd AM.Msg
+exportJSON _ =
+    Cmd.none
+
+
+
+-- ========= ENCODE (for persist port) =========
+
+
+encodeModel : AM.Model -> E.Value
 encodeModel model =
     E.object
         [ ( "items", model.items |> Dict.values |> E.list encodeItem )
@@ -103,32 +145,24 @@ encodeMapItem item =
                 ( "topicProps"
                 , E.object
                     [ ( "pos"
-                      , E.object
-                            [ ( "x", E.float topicProps.pos.x )
-                            , ( "y", E.float topicProps.pos.y )
-                            ]
+                      , E.object [ ( "x", E.float topicProps.pos.x ), ( "y", E.float topicProps.pos.y ) ]
                       )
                     , ( "size"
-                      , E.object
-                            [ ( "w", E.float topicProps.size.w )
-                            , ( "h", E.float topicProps.size.h )
-                            ]
+                      , E.object [ ( "w", E.float topicProps.size.w ), ( "h", E.float topicProps.size.h ) ]
                       )
                     , ( "display", encodeDisplayName topicProps.displayMode )
                     ]
                 )
 
             MapAssoc _ ->
-                ( "assocProps"
-                , E.object []
-                )
+                ( "assocProps", E.object [] )
         ]
 
 
 encodeDisplayName : DisplayMode -> E.Value
 encodeDisplayName displayMode =
-    E.string
-        (case displayMode of
+    E.string <|
+        case displayMode of
             Monad LabelOnly ->
                 "LabelOnly"
 
@@ -143,40 +177,57 @@ encodeDisplayName displayMode =
 
             Container Unboxed ->
                 "Unboxed"
-        )
 
 
 
--- Decode
+-- ========= DECODE (for localStorage) =========
 
 
-fullModelDecoder : D.Decoder Model
+fullModelDecoder : D.Decoder AM.Model
 fullModelDecoder =
-    D.succeed Model
+    D.succeed AM.Model
         |> required "items" (D.list itemDecoder |> D.andThen tupleToDictDecoder)
         |> required "maps" (D.list mapDecoder |> D.andThen toDictDecoder)
         |> required "mapPath" (D.list D.int)
         |> required "nextId" D.int
-        ----- transient -----
-        |> hardcoded default.selection
-        |> hardcoded default.editState
-        |> hardcoded default.measureText
-        -- components
-        |> hardcoded default.mouse
-        |> hardcoded default.search
-        |> hardcoded default.iconMenu
-        -- display (added field in AppModel.Model)
-        |> hardcoded default.display
-        -- fedwiki (NEW)
-        |> hardcoded default.fedWikiRaw
+        -- transient / components come from Defaults (no import cycles)
+        |> hardcoded []
+        -- selection
+        |> hardcoded editState
+        |> hardcoded ""
+        -- measureText
+        |> hardcoded mouse
+        |> hardcoded search
+        |> hardcoded iconMenu
+        -- add these two to close the constructor:
+        |> hardcoded Display.default
+        |> hardcoded ""
 
 
-modelDecoder : D.Decoder AppModel.Model
+modelDecoder : D.Decoder AM.Model
 modelDecoder =
+    -- Try legacy stored blob; otherwise start from an empty in-repo model
     D.oneOf
         [ fullModelDecoder
-        , D.succeed default
+        , D.succeed
+            { items = Dict.empty
+            , maps = Dict.empty
+            , mapPath = []
+            , nextId = 1
+            , selection = []
+            , editState = editState
+            , measureText = ""
+            , mouse = mouse
+            , search = search
+            , iconMenu = iconMenu
+            , display = Display.default
+            , fedWikiRaw = ""
+            }
         ]
+
+
+
+-- ===== helpers for decode =====
 
 
 itemDecoder : D.Decoder ( Id, ItemInfo )
@@ -189,9 +240,7 @@ itemDecoder =
                     D.map3 TopicInfo
                         (D.field "id" D.int)
                         (D.field "text" D.string)
-                        (D.field "icon" D.string
-                            |> D.andThen maybeString
-                        )
+                        (D.field "icon" D.string |> D.andThen maybeString)
                 )
             )
         , D.field "assoc"
@@ -214,12 +263,13 @@ mapDecoder : D.Decoder Map
 mapDecoder =
     D.map3 Map
         (D.field "id" D.int)
-        (D.field "rect" <|
-            D.map4 Rectangle
+        (D.field "rect"
+            (D.map4 Rectangle
                 (D.field "x1" D.float)
                 (D.field "y1" D.float)
                 (D.field "x2" D.float)
                 (D.field "y2" D.float)
+            )
         )
         (D.field "items" (D.list mapItemDecoder |> D.andThen toDictDecoder))
 
@@ -232,21 +282,15 @@ mapItemDecoder =
         (D.field "hidden" D.bool)
         (D.field "pinned" D.bool)
         (D.oneOf
-            [ D.field "topicProps" <|
-                D.map MapTopic <|
-                    D.map3 TopicProps
-                        (D.field "pos" <|
-                            D.map2 Point
-                                (D.field "x" D.float)
-                                (D.field "y" D.float)
-                        )
-                        (D.field "size" <|
-                            D.map2 Size
-                                (D.field "w" D.float)
-                                (D.field "h" D.float)
-                        )
+            [ D.field "topicProps"
+                (D.map MapTopic
+                    (D.map3 TopicProps
+                        (D.field "pos" (D.map2 Point (D.field "x" D.float) (D.field "y" D.float)))
+                        (D.field "size" (D.map2 Size (D.field "w" D.float) (D.field "h" D.float)))
                         (D.field "display" D.string |> D.andThen displayModeDecoder)
-            , D.field "assocProps" <| D.succeed (MapAssoc AssocProps)
+                    )
+                )
+            , D.field "assocProps" (D.succeed (MapAssoc AssocProps))
             ]
         )
 
@@ -292,10 +336,9 @@ displayModeDecoder str =
 maybeString : String -> D.Decoder (Maybe String)
 maybeString str =
     D.succeed
-        (case str of
-            "" ->
-                Nothing
+        (if str == "" then
+            Nothing
 
-            _ ->
-                Just str
+         else
+            Just str
         )
