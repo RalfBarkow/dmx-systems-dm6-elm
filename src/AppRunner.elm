@@ -132,7 +132,7 @@ onFedWikiPage raw undoModel =
                         , activeMap = activeMap m1
                         }
             in
-            ( { undoModel | present = m1 }
+            ( { undoModel | present = { m1 | fedWikiRaw = raw } }
             , Cmd.none
             )
 

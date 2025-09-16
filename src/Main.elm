@@ -6,6 +6,7 @@ import AppModel exposing (..)
 import Boxing exposing (boxContainer, unboxContainer)
 import Browser
 import Browser.Dom as Dom
+import Compat.Display exposing (default)
 import Config exposing (..)
 import Dict
 import Html exposing (Attribute, br, div, text)
@@ -54,7 +55,7 @@ initModel flags =
                 _ =
                     info "init" "localStorage: empty"
             in
-            default
+            AppModel.default
 
         _ ->
             case flags |> D.decodeValue modelDecoder of
@@ -71,7 +72,7 @@ initModel flags =
                         _ =
                             logError "init" "localStorage" e
                     in
-                    default
+                    AppModel.default
 
 
 

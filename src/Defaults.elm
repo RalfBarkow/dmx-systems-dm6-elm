@@ -28,16 +28,16 @@ measureText =
     ""
 
 
-mouse : MouseModel
+mouse : Mouse.Model
 mouse =
     Mouse.init
 
 
-search : SearchModel
+search : Search.Model
 search =
     Search.init
 
 
-iconMenu : IconMenuModel
+iconMenu : IconMenu.Model
 iconMenu =
     IconMenu.init

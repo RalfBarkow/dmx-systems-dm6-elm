@@ -1,5 +1,6 @@
-module AppModel exposing (Model, Msg(..), UndoModel)
+module AppModel exposing (Model, Msg(..), UndoModel, default)
 
+import Compat.Display as Display exposing (DisplayConfig)
 import Dict
 import IconMenu
 import Model exposing (..)
@@ -27,6 +28,10 @@ type alias Model =
     , mouse : Mouse.Model
     , search : Search.Model
     , iconMenu : IconMenu.Model
+
+    -- Federated Wiki
+    , display : DisplayConfig
+    , fedWikiRaw : String
     }
 
 
@@ -50,6 +55,10 @@ default =
     , mouse = Mouse.init
     , search = Search.init
     , iconMenu = IconMenu.init
+
+    -- NEW (cold-boot)
+    , display = Display.default
+    , fedWikiRaw = ""
     }
 
 
