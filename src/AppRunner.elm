@@ -58,19 +58,102 @@ update msg undo =
     case msg of
         FromModel inner ->
             let
+                beforeItems =
+                    Dict.size undo.present.items
+
+                beforeMaps =
+                    Dict.size undo.present.maps
+
+                beforeActive =
+                    activeMap undo.present
+
                 ( undo1, cmd1 ) =
                     Main.update inner undo
+
+                afterItems =
+                    Dict.size undo1.present.items
+
+                afterMaps =
+                    Dict.size undo1.present.maps
+
+                afterActive =
+                    activeMap undo1.present
+
+                _ =
+                    info "app.update.forward"
+                        { itemsBefore = beforeItems
+                        , itemsAfter = afterItems
+                        , itemsDelta = afterItems - beforeItems
+                        , mapsBefore = beforeMaps
+                        , mapsAfter = afterMaps
+                        , mapsDelta = afterMaps - beforeMaps
+                        , activeBefore = beforeActive
+                        , activeAfter = afterActive
+                        }
             in
             ( undo1, Cmd.map FromModel cmd1 )
 
         FedWikiPage rawJson ->
             let
-                ( undo1, _ ) =
-                    onFedWikiPage rawJson undo
+                itemsBefore =
+                    Dict.size undo.present.items
+
+                mapsBefore =
+                    Dict.size undo.present.maps
+
+                activeBefore =
+                    activeMap undo.present
             in
-            ( undo1, Cmd.none )
+            case D.decodeString CFW.decodePage rawJson of
+                Ok val ->
+                    let
+                        ( model1, _ ) =
+                            CFW.pageToModel val undo.present
+
+                        itemsAfter =
+                            Dict.size model1.items
+
+                        mapsAfter =
+                            Dict.size model1.maps
+
+                        activeAfter =
+                            activeMap model1
+
+                        _ =
+                            info "fedwiki.decode.ok"
+                                { rawLen = String.length rawJson }
+
+                        _ =
+                            info "fedwiki.import"
+                                { itemsBefore = itemsBefore
+                                , itemsAfter = itemsAfter
+                                , itemsCreated = itemsAfter - itemsBefore
+                                , mapsBefore = mapsBefore
+                                , mapsAfter = mapsAfter
+                                , mapsDelta = mapsAfter - mapsBefore
+                                , activeBefore = activeBefore
+                                , activeAfter = activeAfter
+                                }
+                    in
+                    ( { undo | present = { model1 | fedWikiRaw = rawJson } }
+                    , Cmd.none
+                    )
+
+                Err err ->
+                    let
+                        _ =
+                            info "fedwiki.decode.err"
+                                { error = Debug.toString err
+                                , rawLen = String.length rawJson
+                                }
+                    in
+                    ( undo, Cmd.none )
 
         NoOp ->
+            let
+                _ =
+                    info "noop" {}
+            in
             ( undo, Cmd.none )
 
 
