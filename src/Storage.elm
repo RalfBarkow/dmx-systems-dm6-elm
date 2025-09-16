@@ -209,21 +209,71 @@ modelDecoder =
     -- Try legacy stored blob; otherwise start from an empty in-repo model
     D.oneOf
         [ fullModelDecoder
-        , D.succeed
-            { items = Dict.empty
-            , maps = Dict.empty
-            , mapPath = []
-            , nextId = 1
-            , selection = []
-            , editState = editState
-            , measureText = ""
-            , mouse = mouse
-            , search = search
-            , iconMenu = iconMenu
-            , display = Display.default
-            , fedWikiRaw = ""
-            }
+        , fallbackDecoder
         ]
+        |> D.map ensureRoot
+
+
+fallbackDecoder : D.Decoder AM.Model
+fallbackDecoder =
+    D.succeed AM.Model
+        -- items
+        |> hardcoded Dict.empty
+        -- maps (will be filled by ensureRoot)
+        |> hardcoded Dict.empty
+        -- mapPath (will be filled by ensureRoot)
+        |> hardcoded []
+        -- nextId (may be bumped by ensureRoot)
+        |> hardcoded 1
+        -- selection
+        |> hardcoded []
+        |> hardcoded editState
+        -- measureText
+        |> hardcoded ""
+        |> hardcoded mouse
+        |> hardcoded search
+        |> hardcoded iconMenu
+        -- display
+        |> hardcoded Display.default
+        -- fedWikiRaw
+        |> hardcoded ""
+
+
+rootRect : M.Rectangle
+rootRect =
+    -- match your stage size
+    M.Rectangle 0 0 1600 1200
+
+
+ensureRoot : AM.Model -> AM.Model
+ensureRoot m0 =
+    let
+        maps1 =
+            if Dict.isEmpty m0.maps then
+                Dict.fromList [ ( 0, M.Map 0 rootRect Dict.empty ) ]
+
+            else
+                m0.maps
+
+        path1 =
+            if List.isEmpty m0.mapPath then
+                [ 0 ]
+
+            else
+                m0.mapPath
+
+        bumpNext n =
+            let
+                maxMapId =
+                    Dict.keys maps1 |> List.maximum |> Maybe.withDefault 0
+            in
+            if n <= maxMapId then
+                maxMapId + 1
+
+            else
+                n
+    in
+    { m0 | maps = maps1, mapPath = path1, nextId = bumpNext m0.nextId }
 
 
 
