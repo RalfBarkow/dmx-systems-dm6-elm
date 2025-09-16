@@ -41,7 +41,7 @@ view undo =
                     activeMap model
     in
     -- Empty mapPath => fullscreen; you see inner story items as LabelOnly circles
-    H.map App.FromMain (viewMap currentMapId [] model)
+    H.map App.FromModel (viewMap currentMapId [] model)
 
 
 main : Program E.Value App.UndoModel App.Msg

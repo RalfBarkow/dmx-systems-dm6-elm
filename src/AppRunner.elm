@@ -35,7 +35,7 @@ type alias UndoModel =
 
 
 type Msg
-    = FromMain AM.Msg
+    = FromModel AM.Msg
     | FedWikiPage String
     | NoOp
 
@@ -46,7 +46,7 @@ init flags =
         ( undo0, cmd0 ) =
             Main.init flags
     in
-    ( undo0, Cmd.map FromMain cmd0 )
+    ( undo0, Cmd.map FromModel cmd0 )
 
 
 
@@ -56,12 +56,12 @@ init flags =
 update : Msg -> AM.UndoModel -> ( AM.UndoModel, Cmd Msg )
 update msg undo =
     case msg of
-        FromMain inner ->
+        FromModel inner ->
             let
                 ( undo1, cmd1 ) =
                     Main.update inner undo
             in
-            ( undo1, Cmd.map FromMain cmd1 )
+            ( undo1, Cmd.map FromModel cmd1 )
 
         FedWikiPage rawJson ->
             let
@@ -76,7 +76,7 @@ update msg undo =
 
 subscriptions : AM.UndoModel -> Sub.Sub Msg
 subscriptions undo =
-    Sub.map FromMain (mouseSubs undo)
+    Sub.map FromModel (mouseSubs undo)
 
 
 
@@ -92,7 +92,7 @@ view undo =
         -- Browser.Document Main.Msg
     in
     { title = doc.title
-    , body = List.map (H.map FromMain) doc.body
+    , body = List.map (H.map FromModel) doc.body
     }
 
 
