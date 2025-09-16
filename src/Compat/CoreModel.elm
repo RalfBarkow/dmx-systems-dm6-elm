@@ -6,6 +6,8 @@ module Compat.CoreModel exposing
     )
 
 import AppModel as AM
+import Compat.Display as CDisp
+import Defaults as Def
 import Dict
 import Model exposing (..)
 
@@ -49,16 +51,18 @@ fromAppModel m =
 -- Transient/UI fields are taken from AM.default.
 
 
-toAppModel : CoreModel -> AM.Model
+toAppModel : { items : Items, maps : Maps, mapPath : MapPath, nextId : Id } -> AM.Model
 toAppModel c =
     { items = c.items
     , maps = c.maps
     , mapPath = c.mapPath
     , nextId = c.nextId
-    , selection = AM.default.selection
-    , editState = AM.default.editState
-    , measureText = AM.default.measureText
-    , mouse = AM.default.mouse
-    , search = AM.default.search
-    , iconMenu = AM.default.iconMenu
+    , selection = Def.selection
+    , editState = Def.editState
+    , measureText = Def.measureText
+    , mouse = Def.mouse
+    , search = Def.search
+    , iconMenu = Def.iconMenu
+    , display = CDisp.default
+    , fedWikiRaw = "" -- or whatever raw you want to seed with
     }

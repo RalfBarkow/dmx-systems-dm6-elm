@@ -1,6 +1,7 @@
 module Feature.OpenDoor.ButtonTest exposing (tests)
 
-import AppModel as AM exposing (Msg(..), default)
+import AppModel as AM exposing (Msg(..))
+import Compat.Display as CDisp
 import Compat.TestUtil exposing (asUndo)
 import Dict
 import Expect
@@ -28,7 +29,7 @@ setupModel =
     let
         -- start with default model
         ( m1, containerId ) =
-            createTopic "Container" Nothing default
+            createTopic "Container" Nothing AM.default
 
         -- container visible on home map (0) as a container
         m2 =
