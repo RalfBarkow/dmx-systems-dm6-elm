@@ -8,20 +8,17 @@ module AppRunner exposing
     , view
     )
 
-import AppModel as AM exposing (UndoModel)
+import AppModel as AM
+import Browser
 import Compat.FedWiki as CFW
-import Config exposing (mainFont)
 import Dict
-import Html as H exposing (Attribute, Html, div)
-import Html.Attributes as HA exposing (style)
+import Html as H
 import Json.Decode as D
 import Json.Encode as E
 import Main
-import MapRenderer exposing (viewMap)
 import ModelAPI exposing (activeMap)
-import MouseAPI exposing (mouseHoverHandler, mouseSubs)
+import MouseAPI exposing (mouseSubs)
 import Platform.Sub as Sub
-import Storage
 import Utils exposing (info)
 
 
@@ -38,8 +35,9 @@ type alias UndoModel =
 
 
 type Msg
-    = Up AM.Msg
+    = FromMain AM.Msg
     | FedWikiPage String
+    | NoOp
 
 
 init : E.Value -> ( AM.UndoModel, Cmd Msg )
@@ -48,7 +46,7 @@ init flags =
         ( undo0, cmd0 ) =
             Main.init flags
     in
-    ( undo0, Cmd.map Up cmd0 )
+    ( undo0, Cmd.map FromMain cmd0 )
 
 
 
@@ -56,54 +54,46 @@ init flags =
 
 
 update : Msg -> AM.UndoModel -> ( AM.UndoModel, Cmd Msg )
-update msg undo0 =
+update msg undo =
     case msg of
-        FedWikiPage raw ->
-            onFedWikiPage raw undo0
-
-        Up m ->
+        FromMain inner ->
             let
                 ( undo1, cmd1 ) =
-                    Main.update m undo0
+                    Main.update inner undo
             in
-            ( undo1, Cmd.map Up cmd1 )
+            ( undo1, Cmd.map FromMain cmd1 )
+
+        FedWikiPage rawJson ->
+            let
+                ( undo1, _ ) =
+                    onFedWikiPage rawJson undo
+            in
+            ( undo1, Cmd.none )
+
+        NoOp ->
+            ( undo, Cmd.none )
 
 
 subscriptions : AM.UndoModel -> Sub.Sub Msg
 subscriptions undo =
-    -- or: mouseSubs undo |> Sub.map Up
-    Sub.map Up (mouseSubs undo)
+    Sub.map FromMain (mouseSubs undo)
 
 
 
 -- Map-only element view (moved here from Main)
 
 
-view : AM.UndoModel -> H.Html Msg
-view undoModel =
+view : AM.UndoModel -> Browser.Document Msg
+view undo =
     let
-        present =
-            undoModel.present
+        doc =
+            Main.view undo
 
-        base : H.Html AM.Msg
-        base =
-            div
-                (mouseHoverHandler ++ appStyle)
-                [ viewMap (activeMap present) [] present ]
+        -- Browser.Document Main.Msg
     in
-    H.map Up base
-
-
-
--- Local copy of the minimal app styles needed for the embed view
-
-
-appStyle : List (H.Attribute AM.Msg)
-appStyle =
-    [ HA.style "font-family" mainFont
-    , HA.style "user-select" "none"
-    , HA.style "line-height" "1.4"
-    ]
+    { title = doc.title
+    , body = List.map (H.map FromMain) doc.body
+    }
 
 
 
