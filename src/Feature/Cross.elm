@@ -24,3 +24,30 @@ view =
         , onClick CrossClick
         ]
         [ text "Cross" ]
+
+
+
+-- ensure the button includes the id "btn-Cross"
+
+
+crossButton : Model -> Html Msg
+crossButton model =
+    let
+        enabled =
+            isEnabled model
+
+        -- whatever your logic is
+    in
+    button
+        ([ Attr.id "btn-Cross"
+         , Attr.style "font-family" "sans-serif"
+         , Attr.style "font-size" "14px"
+         ]
+            ++ (if enabled then
+                    [ onClick CrossClicked ]
+
+                else
+                    [ Attr.disabled True ]
+               )
+        )
+        [ text "Cross" ]

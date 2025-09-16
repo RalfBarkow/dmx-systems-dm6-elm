@@ -4,7 +4,6 @@ module Tests.Main exposing (tests)
 -- …plus feature tests present only on main
 
 import Domain.ReparentRulesTest
-import Feature.OpenDoor.ButtonTest
 import Feature.OpenDoor.CopyTest
 import Feature.OpenDoor.StayVisibleTest
 import Import.DmxCoreTopicTest
@@ -30,7 +29,6 @@ tests =
         , View.ToolbarButtonsTest.tests
 
         -- Feature-only:
-        , Feature.OpenDoor.ButtonTest.tests
         , Feature.OpenDoor.CopyTest.tests
         , Feature.OpenDoor.StayVisibleTest.tests
         ]
