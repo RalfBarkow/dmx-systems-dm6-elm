@@ -16,6 +16,8 @@
             elm
             elm-format
             elm-language-server
+            elm-test
+            elm-review
           ];
         };
       });
