@@ -8,7 +8,7 @@ module Compat.FedWikiImport exposing
 import AppModel as AM
 import Compat.ModelAPI as CAPI
 import Json.Decode as D exposing (Decoder)
-import Model exposing (..)
+import ModelAPI exposing (currentMapId)
 import String
 
 
@@ -22,9 +22,14 @@ type alias Page =
     }
 
 
-type StoryItem
-    = Paragraph String
-    | Unknown
+
+-- Carry both type and text so we can create a label for any story block
+
+
+type alias StoryItem =
+    { typ : String
+    , text : String
+    }
 
 
 
@@ -45,18 +50,9 @@ paragraphTextDecoder =
 
 storyItemDecoder : Decoder StoryItem
 storyItemDecoder =
-    D.oneOf
-        [ D.field "type" D.string
-            |> D.andThen
-                (\t ->
-                    if t == "paragraph" then
-                        D.map Paragraph paragraphTextDecoder
-
-                    else
-                        D.succeed Unknown
-                )
-        , D.succeed Unknown
-        ]
+    D.map2 StoryItem
+        (D.maybe (D.field "type" D.string) |> D.map (Maybe.withDefault "unknown"))
+        (D.maybe (D.field "text" D.string) |> D.map (Maybe.withDefault ""))
 
 
 storyDecoder : Decoder (List StoryItem)
@@ -78,10 +74,9 @@ pageDecoder =
 
 {-| Import a FedWiki page JSON Value into the model.
 
-Rules:
-
   - {} is valid -> title defaults to "empty"
-  - Always create exactly one topic per page (even if story is empty)
+  - Create one topic for the page title
+  - Create one topic per story item that has non-empty text
 
 -}
 importPage : D.Value -> AM.Model -> ( AM.Model, Cmd msg )
@@ -89,14 +84,20 @@ importPage value model0 =
     case D.decodeValue pageDecoder value of
         Err _ ->
             let
+                mid =
+                    currentMapId model0
+
                 ( model1, _ ) =
-                    CAPI.createTopicAndAddToMap "empty" Nothing 0 model0
+                    CAPI.createTopicAndAddToMap "empty" Nothing mid model0
             in
             ( model1, Cmd.none )
 
         Ok page ->
             let
-                normalizedTitle =
+                mid =
+                    currentMapId model0
+
+                titleLabel =
                     page.title
                         |> String.trim
                         |> (\t ->
@@ -107,7 +108,41 @@ importPage value model0 =
                                     t
                            )
 
+                -- Create a topic for the page title
                 ( model1, _ ) =
-                    CAPI.createTopicAndAddToMap normalizedTitle Nothing 0 model0
+                    CAPI.createTopicAndAddToMap titleLabel Nothing mid model0
+
+                -- Create one topic per story item (skip empty)
+                modelN =
+                    List.foldl
+                        (\si m ->
+                            let
+                                raw =
+                                    String.trim si.text
+
+                                label =
+                                    if raw == "" then
+                                        -- fall back to the block type if no text
+                                        si.typ
+
+                                    else
+                                        raw
+                                            |> String.lines
+                                            |> List.head
+                                            |> Maybe.withDefault raw
+                                            |> String.left 120
+                            in
+                            if String.trim label == "" then
+                                m
+
+                            else
+                                let
+                                    ( m2, _ ) =
+                                        CAPI.createTopicAndAddToMap label Nothing mid m
+                                in
+                                m2
+                        )
+                        model1
+                        page.story
             in
-            ( model1, Cmd.none )
+            ( modelN, Cmd.none )

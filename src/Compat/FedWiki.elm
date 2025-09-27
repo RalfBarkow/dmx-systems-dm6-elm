@@ -7,7 +7,6 @@ module Compat.FedWiki exposing
 import AppModel as AM
 import Compat.FedWikiImport as FWI
 import Json.Decode as D
-import Platform.Cmd as Cmd
 
 
 

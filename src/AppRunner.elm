@@ -251,21 +251,22 @@ onFedWikiPage raw undoModel =
                 before =
                     Dict.size undoModel.present.items
 
-                ( m1, _ ) =
+                -- Importer creates the page topic AND all story items
+                ( model1, _ ) =
                     CFW.pageToModel val undoModel.present
 
                 after =
-                    Dict.size m1.items
+                    Dict.size model1.items
 
                 _ =
                     info "fedwiki.import"
                         { before = before
                         , after = after
                         , created = after - before
-                        , activeMap = activeMap m1
+                        , activeMap = activeMap model1
                         }
             in
-            ( { undoModel | present = { m1 | fedWikiRaw = raw } }
+            ( { undoModel | present = { model1 | fedWikiRaw = raw } }
             , Cmd.none
             )
 
