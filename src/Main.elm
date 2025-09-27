@@ -6,7 +6,7 @@ import AppModel exposing (..)
 import Boxing exposing (boxContainer, unboxContainer)
 import Browser
 import Browser.Dom as Dom
-import Compat.Display exposing (default)
+import Compat.Model as CModel
 import Config exposing (..)
 import Dict
 import Html exposing (Attribute, br, div, text)
@@ -16,7 +16,7 @@ import Json.Decode as D
 import Json.Encode as E
 import MapAutoSize exposing (autoSize)
 import MapRenderer exposing (viewMap)
-import Model exposing (..)
+import Model as M exposing (..)
 import ModelAPI exposing (..)
 import MouseAPI exposing (mouseHoverHandler, mouseSubs, updateMouse)
 import SearchAPI exposing (updateSearch, viewResultMenu)
@@ -55,7 +55,7 @@ initModel flags =
                 _ =
                     info "init" "localStorage: empty"
             in
-            AppModel.default
+            AppModel.default |> ensureCurrentMap
 
         _ ->
             case flags |> D.decodeValue modelDecoder of
@@ -65,14 +65,76 @@ initModel flags =
                             info "init"
                                 ("localStorage: " ++ (model |> toString |> String.length |> fromInt) ++ " bytes")
                     in
-                    model
+                    ensureCurrentMap model
 
                 Err e ->
                     let
                         _ =
                             logError "init" "localStorage" e
                     in
-                    AppModel.default
+                    AppModel.default |> ensureCurrentMap
+
+
+type alias Id =
+    Int
+
+
+blankRect : M.Rectangle
+blankRect =
+    { x1 = 0, y1 = 0, x2 = 0, y2 = 0 }
+
+
+
+-- adjust field names if your alias differs
+
+
+emptyItems : M.MapItems
+emptyItems =
+    Dict.empty
+
+
+mkRoot : M.MapId -> M.Map
+mkRoot rid =
+    CModel.makeMapR { id = rid, rect = blankRect, items = emptyItems }
+
+
+{-| Ensure that:
+\* `mapPath` points to an existing map, or
+\* if no maps exist, create a root map with a fresh id and set `mapPath = [rootId]`.
+-}
+ensureCurrentMap : Model -> Model
+ensureCurrentMap model0 =
+    case model0.mapPath of
+        id :: _ ->
+            if Dict.member id model0.maps then
+                model0
+
+            else
+                fallback model0
+
+        [] ->
+            fallback model0
+
+
+fallback : Model -> Model
+fallback model0 =
+    case Dict.keys model0.maps |> List.head of
+        Just firstId ->
+            { model0 | mapPath = [ firstId ] }
+
+        Nothing ->
+            let
+                rid =
+                    model0.nextId
+
+                root =
+                    mkRoot rid
+            in
+            { model0
+                | maps = Dict.insert rid root model0.maps
+                , mapPath = [ rid ]
+                , nextId = rid + 1
+            }
 
 
 
