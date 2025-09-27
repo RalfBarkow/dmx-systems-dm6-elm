@@ -98,43 +98,25 @@ mkRoot rid =
     CModel.makeMapR { id = rid, rect = blankRect, items = emptyItems }
 
 
-{-| Ensure that:
-\* `mapPath` points to an existing map, or
-\* if no maps exist, create a root map with a fresh id and set `mapPath = [rootId]`.
--}
-ensureCurrentMap : Model -> Model
-ensureCurrentMap model0 =
-    case model0.mapPath of
-        id :: _ ->
-            if Dict.member id model0.maps then
-                model0
+ensureRootOnInit : Model -> Model
+ensureRootOnInit model0 =
+    if Dict.isEmpty model0.maps then
+        let
+            rid =
+                model0.nextId
 
-            else
-                fallback model0
+            root =
+                mkRoot rid
+        in
+        { model0
+            | maps = Dict.insert rid root model0.maps
+            , mapPath = [ rid ]
+            , nextId = rid + 1
+        }
 
-        [] ->
-            fallback model0
-
-
-fallback : Model -> Model
-fallback model0 =
-    case Dict.keys model0.maps |> List.head of
-        Just firstId ->
-            { model0 | mapPath = [ firstId ] }
-
-        Nothing ->
-            let
-                rid =
-                    model0.nextId
-
-                root =
-                    mkRoot rid
-            in
-            { model0
-                | maps = Dict.insert rid root model0.maps
-                , mapPath = [ rid ]
-                , nextId = rid + 1
-            }
+    else
+        -- also make sure mapPath head points to an existing map
+        ensureCurrentMap model0
 
 
 

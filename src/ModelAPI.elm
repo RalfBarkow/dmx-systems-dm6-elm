@@ -2,7 +2,7 @@ module ModelAPI exposing (..)
 
 import AppModel exposing (..)
 import Config exposing (..)
-import Dict
+import Dict exposing (Dict)
 import Model exposing (..)
 import String exposing (fromInt)
 import UndoList
@@ -441,30 +441,55 @@ createAssocIn itemType role1 player1 role2 player2 mapId model =
 {-| Precondition: the item is not yet contained in the map
 -}
 addItemToMap : Id -> MapProps -> MapId -> Model -> Model
-addItemToMap itemId props mapId model =
+addItemToMap itemId props incomingMapId model0 =
     let
+        model =
+            ensureCurrentMap model0
+
+        targetMapId =
+            normalizeMapId model incomingMapId
+
         ( newModel, parentAssocId ) =
             createAssoc
                 "dmx.composition"
                 "dmx.child"
                 itemId
                 "dmx.parent"
-                mapId
+                targetMapId
                 model
 
         mapItem =
             MapItem itemId parentAssocId False False props
 
-        -- hidden=False, pinned=False
+        -- Only log normalization when we actually changed it.
         _ =
-            info "addItemToMap"
-                { itemId = itemId, parentAssocId = parentAssocId, props = props, mapId = mapId }
+            if incomingMapId /= targetMapId then
+                info "ModelAPI.addItemToMap.normalized"
+                    { attemptedMapId = incomingMapId
+                    , normalizedTo = targetMapId
+                    , existingMapIds = Dict.keys newModel.maps
+                    , mapPath = newModel.mapPath
+                    }
+                    |> always ()
+                -- <- make it unit
+
+            else
+                ()
+
+        -- log the actual add
+        _ =
+            info "ModelAPI.addItemToMap"
+                { itemId = itemId
+                , mapId = targetMapId
+                , parentAssocId = parentAssocId
+                , props = props
+                }
     in
     { newModel
         | maps =
             updateMaps
-                mapId
-                (\map -> { map | items = map.items |> Dict.insert itemId mapItem })
+                targetMapId
+                (\m -> { m | items = Dict.insert itemId mapItem m.items })
                 newModel.maps
     }
 
@@ -517,20 +542,24 @@ hideItem_ itemId items model =
             )
 
 
-{-| Logs an error if map does not exist
--}
-updateMaps : MapId -> (Map -> Map) -> Maps -> Maps
-updateMaps mapId mapFunc maps =
-    maps
-        |> Dict.update mapId
-            (\map_ ->
-                case map_ of
-                    Just map ->
-                        Just (mapFunc map)
+updateMaps : MapId -> (Map -> Map) -> Dict MapId Map -> Dict MapId Map
+updateMaps mid f maps =
+    case Dict.get mid maps of
+        Just m ->
+            Dict.insert mid (f m) maps
 
-                    Nothing ->
-                        illegalMapId "updateMaps" mapId Nothing
-            )
+        Nothing ->
+            let
+                _ =
+                    logError "updateMaps.illegal-map-id"
+                        ("mapId="
+                            ++ String.fromInt mid
+                            ++ " existing="
+                            ++ toString (Dict.keys maps)
+                        )
+                        maps
+            in
+            maps
 
 
 deleteItem : Id -> Model -> Model
@@ -709,3 +738,54 @@ illegalItemId funcName id val =
 illegalId : String -> String -> Id -> a -> a
 illegalId funcName item id val =
     logError funcName (fromInt id ++ " is an illegal " ++ item ++ " ID") val
+
+
+
+-- === Root-map helpers (moved here to avoid importing Main) ==================
+
+
+{-| Ensure that:
+\* `mapPath` points to an existing map
+-}
+ensureCurrentMap : Model -> Model
+ensureCurrentMap model0 =
+    case model0.mapPath of
+        id :: _ ->
+            if Dict.member id model0.maps then
+                model0
+
+            else
+                sanitize model0
+
+        [] ->
+            sanitize model0
+
+
+sanitize : Model -> Model
+sanitize model0 =
+    case Dict.keys model0.maps |> List.head of
+        Just firstId ->
+            { model0 | mapPath = [ firstId ] }
+
+        Nothing ->
+            -- No maps here; creation happens in Main on init
+            model0
+
+
+currentMapId : Model -> MapId
+currentMapId model =
+    case model.mapPath of
+        mid :: _ ->
+            mid
+
+        [] ->
+            Debug.todo "ensureCurrentMap guarantees a head during runtime"
+
+
+normalizeMapId : Model -> MapId -> MapId
+normalizeMapId model mid =
+    if Dict.member mid model.maps then
+        mid
+
+    else
+        currentMapId (ensureCurrentMap model)
