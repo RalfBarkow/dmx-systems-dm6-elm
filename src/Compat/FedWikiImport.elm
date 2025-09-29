@@ -13,6 +13,7 @@ import Json.Encode as E
 import Model exposing (Id)
 import ModelAPI exposing (currentMapId)
 import String
+import Utils
 
 
 
@@ -100,9 +101,15 @@ importPage value model0 =
 
                 -- no story items on error; still persist meta
                 model3 =
-                    { model2 | fedWikiRaw = encodeFwMeta titleId [] }
+                    { model2
+                        | fedWikiRaw = encodeFwMeta titleId []
+                        , fedWiki =
+                            { storyItemIds = []
+                            , containerId = Just titleId
+                            }
+                    }
             in
-            ( model1, Cmd.none )
+            ( model3, Cmd.none )
 
         Ok page ->
             let
@@ -154,7 +161,7 @@ importPage value model0 =
 
                         label =
                             if label0 == "" then
-                                "empty"
+                                "untitled"
 
                             else
                                 label0
@@ -171,11 +178,24 @@ importPage value model0 =
                 storyIds =
                     List.reverse revIds
 
-                -- 4) Persist lightweight meta into fedWikiRaw (no Storage changes)
-                modelN =
-                    { model3 | fedWikiRaw = encodeFwMeta titleId storyIds }
+                -- Debug logging
+                _ =
+                    Utils.info "@fedwiki.import.structured"
+                        { containerId = titleId
+                        , storyCount = List.length storyIds
+                        }
+
+                -- 4) Persist lightweight meta into fedWikiRaw AND structured data
+                modelFinal =
+                    { model3
+                        | fedWikiRaw = encodeFwMeta titleId storyIds
+                        , fedWiki =
+                            { storyItemIds = storyIds
+                            , containerId = Just titleId
+                            }
+                    }
             in
-            ( modelN, Cmd.none )
+            ( modelFinal, Cmd.none )
 
 
 encodeFwMeta : Int -> List Int -> String

@@ -2,6 +2,7 @@ module Compat.ModelAPI exposing
     ( -- overlayed (guarded) write-path
       addItemToMap
     , addItemToMapDefault
+    , childItemIdsOf
     , createAssoc
     , createAssocAndAddToMap
     , createTopic
@@ -225,3 +226,18 @@ ensureChildMap topicId model =
             -- model2 = MAPI.setDisplayModeInAllMaps topicId (Container BlackBox) model1
         in
         ( model1, topicId )
+
+
+childItemIdsOf : Id -> AM.Model -> List Id
+childItemIdsOf topicId model =
+    case currentMapIdOf topicId model of
+        Just mapId ->
+            case getMap mapId model.maps of
+                Just map ->
+                    Dict.keys map.items
+
+                Nothing ->
+                    []
+
+        Nothing ->
+            []

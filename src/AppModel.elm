@@ -39,7 +39,14 @@ type alias Model =
 
     -- Federated Wiki
     , display : DisplayConfig
-    , fedWikiRaw : String
+    , fedWikiRaw : String -- keep for raw JSON
+    , fedWiki : FedWikiData -- add structured data
+    }
+
+
+type alias FedWikiData =
+    { storyItemIds : List Id
+    , containerId : Maybe Id
     }
 
 
@@ -70,6 +77,10 @@ default =
     -- Federated Wiki
     , display = Display.default
     , fedWikiRaw = ""
+    , fedWiki =
+        { storyItemIds = []
+        , containerId = Nothing
+        }
     }
 
 

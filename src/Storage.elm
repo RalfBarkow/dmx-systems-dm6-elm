@@ -202,16 +202,8 @@ fullModelDecoder =
         -- add these two to close the constructor:
         |> hardcoded Display.default
         |> hardcoded ""
-
-
-modelDecoder : D.Decoder AM.Model
-modelDecoder =
-    -- Try legacy stored blob; otherwise start from an empty in-repo model
-    D.oneOf
-        [ fullModelDecoder
-        , fallbackDecoder
-        ]
-        |> D.map ensureRoot
+        -- ADD THIS LINE for the new fedWiki field
+        |> hardcoded { storyItemIds = [], containerId = Nothing }
 
 
 fallbackDecoder : D.Decoder AM.Model
@@ -237,6 +229,18 @@ fallbackDecoder =
         |> hardcoded Display.default
         -- fedWikiRaw
         |> hardcoded ""
+        -- ADD THIS LINE for the new fedWiki field
+        |> hardcoded { storyItemIds = [], containerId = Nothing }
+
+
+modelDecoder : D.Decoder AM.Model
+modelDecoder =
+    -- Try legacy stored blob; otherwise start from an empty in-repo model
+    D.oneOf
+        [ fullModelDecoder
+        , fallbackDecoder
+        ]
+        |> D.map ensureRoot
 
 
 rootRect : M.Rectangle

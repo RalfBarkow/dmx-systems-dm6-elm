@@ -1,7 +1,7 @@
 module MapRenderer exposing (viewMap)
 
 import AppModel exposing (..)
-import Compat.ModelAPI exposing (getMapItemById)
+import Compat.ModelAPI exposing (currentMapIdOf, getMapItemById)
 import Config exposing (..)
 import Dict
 import Html exposing (Attribute, Html, div, input, textarea)
@@ -22,6 +22,7 @@ import ModelAPI
         , getTopicSize
         , isFullscreen
         , isItemInMap
+        , isMapTopic
         , isSelected
         , isVisible
         )
@@ -466,20 +467,12 @@ hasChildMap topicId model =
 
 {-| A topic is considered the FedWiki page container iff:
 
-1.  it has a child map, and
-2.  its label matches the FedWiki page title (case-insensitive, trimmed).
+it has a containerId
 
 -}
 isFedWikiPage : Id -> Model -> Bool
 isFedWikiPage topicId model =
-    case ( fedWikiTitle model, topicInfoOf topicId model ) of
-        ( Just title_, Just ti ) ->
-            toLower (trim (getTopicLabel ti))
-                == toLower (trim title_)
-                && hasChildMap topicId model
-
-        _ ->
-            False
+    model.fedWiki.containerId == Just topicId
 
 
 
@@ -493,7 +486,8 @@ effectiveDisplayMode topicId displayMode model =
             model.search.menu == Open (Just topicId)
     in
     if isFedWikiPage topicId model then
-        Container WhiteBox
+        info "isFedWikiPage -> forcing WhiteBox" topicId
+            |> (\_ -> Container WhiteBox)
 
     else if isLimbo then
         case displayMode of
@@ -505,10 +499,6 @@ effectiveDisplayMode topicId displayMode model =
 
     else
         displayMode
-
-
-
--- Ensure overflow hidden; also make sure there is only ONE definition of whiteBoxStyle in file
 
 
 whiteBoxStyle : Id -> Rectangle -> MapId -> Model -> List (Attribute Msg)
@@ -725,22 +715,48 @@ mapItemCount : Id -> TopicProps -> Model -> List (Html Msg)
 mapItemCount topicId props model =
     let
         itemCount =
-            case props.displayMode of
+            case effectiveDisplayMode topicId props.displayMode model of
                 Monad _ ->
                     0
 
                 Container _ ->
-                    case getMap topicId model.maps of
-                        Just map ->
-                            map.items |> Dict.values |> List.filter isVisible |> List.length
-
-                        Nothing ->
-                            0
+                    childCount topicId model
     in
     [ div
         itemCountStyle
         [ Html.text <| fromInt itemCount ]
     ]
+
+
+
+-- Count only topics in the child map (map id == topic id)
+
+
+childMapTopicCount : Id -> Model -> Int
+childMapTopicCount topicId model =
+    case Dict.get topicId model.maps of
+        Just m ->
+            m.items
+                |> Dict.values
+                |> List.filter isMapTopic
+                |> List.filter isVisible
+                |> List.length
+
+        Nothing ->
+            0
+
+
+
+-- Unified child count (FedWiki-aware)
+
+
+childCount : Id -> Model -> Int
+childCount topicId model =
+    if isFedWikiPage topicId model then
+        List.length model.fedWiki.storyItemIds
+
+    else
+        childMapTopicCount topicId model
 
 
 
