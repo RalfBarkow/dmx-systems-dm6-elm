@@ -65,4 +65,8 @@ toAppModel c =
     , iconMenu = Def.iconMenu
     , display = CDisp.default
     , fedWikiRaw = "" -- or whatever raw you want to seed with
+    , fedWiki =
+        { storyItemIds = []
+        , containerId = Nothing
+        }
     }

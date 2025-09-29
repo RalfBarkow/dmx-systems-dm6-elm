@@ -383,14 +383,19 @@ isTargeted topicId mapId model =
             False
 
 
+
+-- VIEW TOPIC
+
+
 viewTopic : TopicInfo -> TopicProps -> MapPath -> Model -> Html Msg
 viewTopic topic props mapPath model =
     let
-        -- decide final mode
+        -- decide final mode (single source of truth)
+        mode1 : DisplayMode
         mode1 =
             effectiveDisplayMode topic.id props.displayMode model
 
-        -- choose renderer + a name we can expose in the DOM for quick checks
+        -- choose renderer + a name we surface for quick DOM inspection
         ( topicFunc, rendererName ) =
             case mode1 of
                 Container WhiteBox ->
@@ -408,38 +413,26 @@ viewTopic topic props mapPath model =
                 _ ->
                     ( labelTopic, "labelTopic" )
 
-        -- renderer output (additional attrs + children)
-        ( styleFromFunc, childrenFromFunc ) =
+        -- renderer-provided attrs/children
+        ( attrsFromRenderer, childrenFromRenderer ) =
             topicFunc topic props mapPath model
 
-        -- IMPORTANT: keep htmlTopicAttr (listeners/ids) and the dragHandle child
-        -- Attribute order: base position/size -> mode-dependent visuals -> renderer extras -> diagnostics
+        -- IMPORTANT attribute order:
+        --   1) htmlTopicAttr (ids, event handlers, drag)
+        --   2) base pos/size + mode visuals
+        --   3) renderer extras (e.g. scream/outline)
+        --   4) diagnostics
         finalAttrs =
             htmlTopicAttr topic.id mapPath
                 ++ topicStyleWithMode topic.id mode1 model
-                ++ styleFromFunc
+                ++ attrsFromRenderer
                 ++ [ Attr.attribute "data-mode0" (displayModeToString props.displayMode)
                    , Attr.attribute "data-mode1" (displayModeToString mode1)
                    , Attr.attribute "data-renderer" rendererName
                    , boolAttr "data-isFedWikiPage" (isFedWikiPage topic.id model)
                    ]
     in
-    Html.div finalAttrs (dragHandle topic.id mapPath :: childrenFromFunc)
-
-
-
--- Helper: turn a Bool into a data-* attribute value
-
-
-boolAttr : String -> Bool -> Html.Attribute msg
-boolAttr name value =
-    Attr.attribute name
-        (if value then
-            "true"
-
-         else
-            "false"
-        )
+    Html.div finalAttrs (dragHandle topic.id mapPath :: childrenFromRenderer)
 
 
 {-| Extract the page title from Model.fedWikiRaw.
@@ -499,11 +492,16 @@ it has a containerId
 -}
 isFedWikiPage : Id -> Model -> Bool
 isFedWikiPage topicId model =
-    model.fedWiki.containerId == Just topicId
+    case model.fedWiki.containerId of
+        Just containerId ->
+            containerId == topicId
+
+        Nothing ->
+            False
 
 
 
--- Only force WhiteBox for true FedWiki page containers (with child map)
+-- Effective mode decision (force FedWiki to WhiteBox; limbo tweaks)
 
 
 effectiveDisplayMode : Id -> DisplayMode -> Model -> DisplayMode
@@ -531,7 +529,6 @@ effectiveDisplayMode topicId incoming model =
             else
                 incoming
 
-        -- one structured log per call; no branches, no early returns
         _ =
             info "effectiveDisplayMode"
                 ( topicId
@@ -543,6 +540,10 @@ effectiveDisplayMode topicId incoming model =
                 )
     in
     decided
+
+
+
+-- Tiny helpers for diagnostics + style composition
 
 
 displayModeToString : DisplayMode -> String
@@ -565,17 +566,27 @@ displayModeToString mode =
 
 
 
--- base styles (pos/size/etc.) that do NOT depend on mode
+-- Helper: turn a Bool into a data-* attribute value
+
+
+boolAttr : String -> Bool -> Html.Attribute msg
+boolAttr name value =
+    Attr.attribute name
+        (if value then
+            "true"
+
+         else
+            "false"
+        )
+
+
+
+-- base (pos/size/etc.) + visuals that depend on mode
 
 
 baseTopicStyles : Id -> Model -> List (Html.Attribute Msg)
 baseTopicStyles tid model =
     topicStyle tid model
-
-
-
--- keep your existing base style for now
--- visuals that DO depend on the chosen mode
 
 
 displayModeStyles : DisplayMode -> List (Html.Attribute Msg)
@@ -594,6 +605,11 @@ displayModeStyles mode =
 
         _ ->
             []
+
+
+topicStyleWithMode : Id -> DisplayMode -> Model -> List (Html.Attribute Msg)
+topicStyleWithMode tid mode model =
+    baseTopicStyles tid model ++ displayModeStyles mode
 
 
 whiteBoxStyle : Id -> Rectangle -> MapId -> Model -> List (Attribute Msg)
@@ -781,9 +797,16 @@ blackBoxTopic topic props mapPath model =
     )
 
 
+
+-- RENDERERS (only WhiteBox shown; keep your other renderers unchanged)
+
+
 whiteBoxTopic : TopicInfo -> TopicProps -> MapPath -> Model -> TopicRendering
 whiteBoxTopic topic props mapPath model =
     let
+        _ =
+            info "whiteBoxTopic.called" { topicId = topic.id }
+
         ( styleLabel, childrenLabel ) =
             labelTopic topic props mapPath model
 
@@ -1042,11 +1065,6 @@ topicStyle id model =
         else
             "2"
     ]
-
-
-topicStyleWithMode : Id -> DisplayMode -> Model -> List (Html.Attribute Msg)
-topicStyleWithMode tid mode model =
-    baseTopicStyles tid model ++ displayModeStyles mode
 
 
 selectionStyle : Id -> MapId -> Model -> List (Attribute Msg)

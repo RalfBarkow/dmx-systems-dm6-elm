@@ -11,10 +11,10 @@ import Compat.ModelAPI as CAPI
 import Dict
 import Json.Decode as D exposing (Decoder)
 import Json.Encode as E
-import Model exposing (AssocProps, DisplayMode(..), Id, MapItem, MapItems, MapProps(..), Rectangle, TopicProps)
+import Model exposing (DisplayMode(..), Id, MapItem, MapItems, MapProps(..), Rectangle, TopicProps)
 import ModelAPI exposing (currentMapId, updateMaps)
 import String
-import Utils
+import Utils exposing (info)
 
 
 
@@ -97,14 +97,13 @@ importPage value model0 =
                 ( model1, titleId ) =
                     CAPI.createTopicAndAddToMap "empty" Nothing mid model0
 
-                -- Set display mode to WhiteBox immediately after creation
+                -- Immediately show the title as a WhiteBox container on the current map
                 model1a =
                     setWhiteBoxOnCurrentMap titleId model1
 
                 ( model2, childMid ) =
                     CAPI.ensureChildMap titleId model1a
 
-                -- no story items on error; still persist meta
                 model3 =
                     { model2
                         | fedWikiRaw = encodeFwMeta titleId []
@@ -133,19 +132,19 @@ importPage value model0 =
                                     t
                            )
 
-                -- 1) Create a topic for the page title (container) in current map
+                -- 1) Create title topic (container) in current map
                 ( model1, titleId ) =
                     CAPI.createTopicAndAddToMap titleLabel Nothing mid model0
 
-                -- Set display mode to WhiteBox immediately after creation
+                -- 2) Flip it to WhiteBox on the current map *immediately*
                 model1a =
                     setWhiteBoxOnCurrentMap titleId model1
 
-                -- 2) Ensure the container has a child map
+                -- 3) Ensure the container has a child map
                 ( model2, childMid ) =
                     CAPI.ensureChildMap titleId model1a
 
-                -- 3) Create topics for each story item inside the CHILD map
+                -- 4) Create topics for each story item inside the CHILD map
                 step :
                     StoryItem
                     -> ( List Id, AM.Model )
@@ -157,7 +156,6 @@ importPage value model0 =
 
                         label0 =
                             if raw == "" then
-                                -- fall back to the block type if no text
                                 String.trim si.typ
 
                             else
@@ -174,8 +172,7 @@ importPage value model0 =
 
                             else
                                 label0
-                    in
-                    let
+
                         ( m2, id2 ) =
                             CAPI.createTopicAndAddToMap label Nothing childMid m
                     in
@@ -187,14 +184,12 @@ importPage value model0 =
                 storyIds =
                     List.reverse revIds
 
-                -- Debug logging
                 _ =
-                    Utils.info "fedwiki.import.structured"
+                    info "fedwiki.import.structured"
                         { containerId = titleId
                         , storyCount = List.length storyIds
                         }
 
-                -- 4) Persist lightweight meta into fedWikiRaw AND structured data
                 modelFinal =
                     { model3
                         | fedWikiRaw = encodeFwMeta titleId storyIds
@@ -216,15 +211,15 @@ encodeFwMeta containerId storyItemIds =
             ]
 
 
-
-{- Helper: immediately flip the freshly created title item to Container WhiteBox
-   on the *current* map (the same map we just added it to).
+{-| Immediately flip the freshly created title item to Container WhiteBox
+on the _current_ map (the same map we just added it to).
 -}
-
-
 setWhiteBoxOnCurrentMap : Id -> AM.Model -> AM.Model
 setWhiteBoxOnCurrentMap tid model =
     let
+        _ =
+            info "setWhiteBoxOnCurrentMap" { topicId = tid, currentMapId = currentMapId model }
+
         mid =
             currentMapId model
 

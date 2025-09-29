@@ -166,11 +166,9 @@ unboxTopic containerItem targetItems model =
                                             Container BlackBox ->
                                                 item
 
-                                            -- respect BlackBox
                                             Container WhiteBox ->
                                                 item
 
-                                            -- already WhiteBox
                                             _ ->
                                                 setWhiteBox item
 
@@ -274,8 +272,3 @@ targetAssocItem assocId targetItems =
 
         Nothing ->
             MapItem assocId -1 False False (MapAssoc AssocProps)
-
-
-
--- hidden/pinned=False
--- FIXME: set item's parentAssocId?
