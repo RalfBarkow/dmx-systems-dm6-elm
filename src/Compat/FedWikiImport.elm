@@ -1,5 +1,6 @@
 module Compat.FedWikiImport exposing
     ( Page
+    , encodeFwMeta
     , importPage
     , pageDecoder
     , storyItemDecoder
@@ -8,6 +9,8 @@ module Compat.FedWikiImport exposing
 import AppModel as AM
 import Compat.ModelAPI as CAPI
 import Json.Decode as D exposing (Decoder)
+import Json.Encode as E
+import Model exposing (Id)
 import ModelAPI exposing (currentMapId)
 import String
 
@@ -75,21 +78,29 @@ pageDecoder =
 {-| Import a FedWiki page JSON Value into the model.
 
   - {} is valid -> title defaults to "empty"
-  - Create one topic for the page title
-  - Create one topic per story item that has non-empty text
+  - Create one topic for the page title (container)
+  - Ensure it has a child map
+  - Create one topic per story item **in the child map**
+  - Persist lightweight meta (container + story ids) into `fedWikiRaw`
 
 -}
 importPage : D.Value -> AM.Model -> ( AM.Model, Cmd msg )
 importPage value model0 =
     case D.decodeValue pageDecoder value of
         Err _ ->
-            -- Fallback for invalid JSON
             let
                 mid =
                     currentMapId model0
 
-                ( model1, _ ) =
+                ( model1, titleId ) =
                     CAPI.createTopicAndAddToMap "empty" Nothing mid model0
+
+                ( model2, childMid ) =
+                    CAPI.ensureChildMap titleId model1
+
+                -- no story items on error; still persist meta
+                model3 =
+                    { model2 | fedWikiRaw = encodeFwMeta titleId [] }
             in
             ( model1, Cmd.none )
 
@@ -98,6 +109,7 @@ importPage value model0 =
                 mid =
                     currentMapId model0
 
+                titleLabel : String
                 titleLabel =
                     page.title
                         |> String.trim
@@ -109,41 +121,67 @@ importPage value model0 =
                                     t
                            )
 
-                -- Create a topic for the page title
-                ( model1, _ ) =
+                -- 1) Create a topic for the page title (container) in current map
+                ( model1, titleId ) =
                     CAPI.createTopicAndAddToMap titleLabel Nothing mid model0
 
-                -- Create one topic per story item (skip empty)
-                modelN =
-                    List.foldl
-                        (\si m ->
-                            let
-                                raw =
-                                    String.trim si.text
+                -- 2) Ensure the container has a child map
+                ( model2, childMid ) =
+                    CAPI.ensureChildMap titleId model1
 
-                                label =
-                                    if raw == "" then
-                                        -- fall back to the block type if no text
-                                        si.typ
+                -- 3) Create topics for each story item inside the CHILD map
+                step :
+                    StoryItem
+                    -> ( List Id, AM.Model )
+                    -> ( List Id, AM.Model )
+                step si ( accIds, m ) =
+                    let
+                        raw =
+                            String.trim si.text
 
-                                    else
-                                        raw
-                                            |> String.lines
-                                            |> List.head
-                                            |> Maybe.withDefault raw
-                                            |> String.left 120
-                            in
-                            if String.trim label == "" then
-                                m
+                        label0 =
+                            if raw == "" then
+                                -- fall back to the block type if no text
+                                String.trim si.typ
 
                             else
-                                let
-                                    ( m2, _ ) =
-                                        CAPI.createTopicAndAddToMap label Nothing mid m
-                                in
-                                m2
-                        )
-                        model1
-                        page.story
+                                raw
+                                    |> String.lines
+                                    |> List.head
+                                    |> Maybe.withDefault raw
+                                    |> String.left 120
+                                    |> String.trim
+
+                        label =
+                            if label0 == "" then
+                                "empty"
+
+                            else
+                                label0
+                    in
+                    let
+                        ( m2, id2 ) =
+                            CAPI.createTopicAndAddToMap label Nothing childMid m
+                    in
+                    ( id2 :: accIds, m2 )
+
+                ( revIds, model3 ) =
+                    List.foldl step ( [], model2 ) page.story
+
+                storyIds =
+                    List.reverse revIds
+
+                -- 4) Persist lightweight meta into fedWikiRaw (no Storage changes)
+                modelN =
+                    { model3 | fedWikiRaw = encodeFwMeta titleId storyIds }
             in
             ( modelN, Cmd.none )
+
+
+encodeFwMeta : Int -> List Int -> String
+encodeFwMeta containerId storyItemIds =
+    E.encode 0 <|
+        E.object
+            [ ( "containerId", E.int containerId )
+            , ( "storyItemIds", E.list E.int storyItemIds )
+            ]
