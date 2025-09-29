@@ -83,6 +83,7 @@ importPage : D.Value -> AM.Model -> ( AM.Model, Cmd msg )
 importPage value model0 =
     case D.decodeValue pageDecoder value of
         Err _ ->
+            -- Fallback for invalid JSON
             let
                 mid =
                     currentMapId model0

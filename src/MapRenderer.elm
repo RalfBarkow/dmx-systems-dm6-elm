@@ -27,7 +27,7 @@ import ModelAPI
         )
 import Mouse exposing (DragMode(..), DragState(..))
 import Search exposing (ResultMenu(..))
-import String exposing (fromFloat, fromInt)
+import String exposing (fromFloat, fromInt, toLower, trim)
 import Svg exposing (Svg, circle, g, path, rect, svg)
 import Svg.Attributes as SA
     exposing
@@ -414,6 +414,79 @@ viewTopic topic props mapPath model =
         (dragHandle topic.id mapPath :: children)
 
 
+{-| Extract the page title from Model.fedWikiRaw.
+-}
+fedWikiTitle : Model -> Maybe String
+fedWikiTitle model =
+    if String.isEmpty model.fedWikiRaw then
+        Nothing
+
+    else
+        case D.decodeString (D.field "title" D.string) model.fedWikiRaw of
+            Ok t ->
+                let
+                    s =
+                        trim t
+                in
+                if String.isEmpty s then
+                    Nothing
+
+                else
+                    Just s
+
+            Err _ ->
+                Nothing
+
+
+{-| Get TopicInfo (if this Id refers to a Topic).
+-}
+topicInfoOf : Id -> Model -> Maybe TopicInfo
+topicInfoOf topicId model =
+    case Dict.get topicId model.items of
+        Just { info } ->
+            case info of
+                Topic ti ->
+                    Just ti
+
+                _ ->
+                    Nothing
+
+        _ ->
+            Nothing
+
+
+{-| A topic is considered the FedWiki page container iff:
+
+1.  it has a child map, and
+2.  its label matches the FedWiki page title (case-insensitive, trimmed).
+
+-}
+isFedWikiPage : TopicInfo -> Model -> Bool
+isFedWikiPage topic model =
+    let
+        hasChildMap =
+            case getMap topic.id model.maps of
+                Just _ ->
+                    True
+
+                Nothing ->
+                    False
+
+        matchesTitle =
+            case fedWikiTitle model of
+                Just title_ ->
+                    toLower (trim (getTopicLabel topic)) == toLower (trim title_)
+
+                Nothing ->
+                    False
+    in
+    hasChildMap && matchesTitle
+
+
+
+-- Update the effectiveDisplayMode function
+
+
 effectiveDisplayMode : Id -> DisplayMode -> Model -> DisplayMode
 effectiveDisplayMode topicId displayMode model =
     let
@@ -430,6 +503,33 @@ effectiveDisplayMode topicId displayMode model =
 
     else
         displayMode
+
+
+
+-- Update the whiteBoxStyle function to add overflow: hidden
+
+
+whiteBoxStyle : Id -> Rectangle -> MapId -> Model -> List (Attribute Msg)
+whiteBoxStyle topicId rect mapId model =
+    let
+        width =
+            rect.x2 - rect.x1
+
+        height =
+            rect.y2 - rect.y1
+
+        r =
+            fromInt whiteBoxRadius ++ "px"
+    in
+    [ style "position" "absolute"
+    , style "left" <| fromFloat -topicBorderWidth ++ "px"
+    , style "top" <| fromFloat (topicSize.h - 2 * topicBorderWidth) ++ "px"
+    , style "width" <| fromFloat width ++ "px"
+    , style "height" <| fromFloat height ++ "px"
+    , style "border-radius" <| "0 " ++ r ++ " " ++ r ++ " " ++ r
+    ]
+        ++ topicBorderStyle topicId mapId model
+        ++ selectionStyle topicId mapId model
 
 
 labelTopic : TopicInfo -> TopicProps -> MapPath -> Model -> TopicRendering
@@ -938,29 +1038,6 @@ itemCountStyle =
     , style "position" "absolute"
     , style "left" "calc(100% + 12px)"
     ]
-
-
-whiteBoxStyle : Id -> Rectangle -> MapId -> Model -> List (Attribute Msg)
-whiteBoxStyle topicId rect mapId model =
-    let
-        width =
-            rect.x2 - rect.x1
-
-        height =
-            rect.y2 - rect.y1
-
-        r =
-            fromInt whiteBoxRadius ++ "px"
-    in
-    [ style "position" "absolute"
-    , style "left" <| fromFloat -topicBorderWidth ++ "px"
-    , style "top" <| fromFloat (topicSize.h - 2 * topicBorderWidth) ++ "px"
-    , style "width" <| fromFloat width ++ "px"
-    , style "height" <| fromFloat height ++ "px"
-    , style "border-radius" <| "0 " ++ r ++ " " ++ r ++ " " ++ r
-    ]
-        ++ topicBorderStyle topicId mapId model
-        ++ selectionStyle topicId mapId model
 
 
 topicBorderStyle : Id -> MapId -> Model -> List (Attribute Msg)
