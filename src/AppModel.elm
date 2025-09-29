@@ -3,18 +3,26 @@ module AppModel exposing (Model, Msg(..), UndoModel, default)
 import Compat.Display as Display exposing (DisplayConfig)
 import Dict
 import IconMenu
-import Model exposing (..)
+import Model exposing (DisplayMode, EditMsg, EditState(..), Id, Items, Map, MapId, MapPath, Maps, NavMsg, Point, Rectangle, Selection)
 import Mouse
 import Search
 import UndoList exposing (UndoList)
+
+
+
+-- UNDO
 
 
 type alias UndoModel =
     UndoList Model
 
 
+
+-- MODEL (must match what Storage.elm builds)
+
+
 type alias Model =
-    { items : Items -- TODO: represent container content independent from maps?
+    { items : Items
     , maps : Maps
     , mapPath : MapPath
     , nextId : Id
@@ -35,14 +43,17 @@ type alias Model =
     }
 
 
+
+-- DEFAULT
+
+
 default : Model
 default =
     { items = Dict.empty
     , maps =
         Dict.singleton 0
-        -- map 0 is the "home map", it has no corresponding topic
-        <|
-            Map 0 (Rectangle 0 0 0 0) Dict.empty
+            -- map 0 is the "home map", it has no corresponding topic
+            (Map 0 (Rectangle 0 0 0 0) Dict.empty)
     , mapPath = [ 0 ]
     , nextId = 1
 
@@ -56,25 +67,14 @@ default =
     , search = Search.init
     , iconMenu = IconMenu.init
 
-    -- NEW (cold-boot)
+    -- Federated Wiki
     , display = Display.default
     , fedWikiRaw = ""
     }
 
 
-resetTransientState : Model -> Model
-resetTransientState model =
-    { model
-      ----- transient -----
-        | selection = default.selection
-        , editState = default.editState
-        , measureText = default.measureText
 
-        -- components
-        , mouse = default.mouse
-        , search = default.search
-        , iconMenu = default.iconMenu
-    }
+-- MESSAGES
 
 
 type Msg

@@ -455,36 +455,35 @@ topicInfoOf topicId model =
             Nothing
 
 
+
+-- Safe child-map existence check (no error logs)
+
+
+hasChildMap : Id -> Model -> Bool
+hasChildMap topicId model =
+    Dict.member topicId model.maps
+
+
 {-| A topic is considered the FedWiki page container iff:
 
 1.  it has a child map, and
 2.  its label matches the FedWiki page title (case-insensitive, trimmed).
 
 -}
-isFedWikiPage : TopicInfo -> Model -> Bool
-isFedWikiPage topic model =
-    let
-        hasChildMap =
-            case getMap topic.id model.maps of
-                Just _ ->
-                    True
+isFedWikiPage : Id -> Model -> Bool
+isFedWikiPage topicId model =
+    case ( fedWikiTitle model, topicInfoOf topicId model ) of
+        ( Just title_, Just ti ) ->
+            toLower (trim (getTopicLabel ti))
+                == toLower (trim title_)
+                && hasChildMap topicId model
 
-                Nothing ->
-                    False
-
-        matchesTitle =
-            case fedWikiTitle model of
-                Just title_ ->
-                    toLower (trim (getTopicLabel topic)) == toLower (trim title_)
-
-                Nothing ->
-                    False
-    in
-    hasChildMap && matchesTitle
+        _ ->
+            False
 
 
 
--- Update the effectiveDisplayMode function
+-- Only force WhiteBox for true FedWiki page containers (with child map)
 
 
 effectiveDisplayMode : Id -> DisplayMode -> Model -> DisplayMode
@@ -493,7 +492,10 @@ effectiveDisplayMode topicId displayMode model =
         isLimbo =
             model.search.menu == Open (Just topicId)
     in
-    if isLimbo then
+    if isFedWikiPage topicId model then
+        Container WhiteBox
+
+    else if isLimbo then
         case displayMode of
             Monad _ ->
                 Monad Detail
@@ -506,7 +508,7 @@ effectiveDisplayMode topicId displayMode model =
 
 
 
--- Update the whiteBoxStyle function to add overflow: hidden
+-- Ensure overflow hidden; also make sure there is only ONE definition of whiteBoxStyle in file
 
 
 whiteBoxStyle : Id -> Rectangle -> MapId -> Model -> List (Attribute Msg)
@@ -527,6 +529,7 @@ whiteBoxStyle topicId rect mapId model =
     , style "width" <| fromFloat width ++ "px"
     , style "height" <| fromFloat height ++ "px"
     , style "border-radius" <| "0 " ++ r ++ " " ++ r ++ " " ++ r
+    , style "overflow" "hidden"
     ]
         ++ topicBorderStyle topicId mapId model
         ++ selectionStyle topicId mapId model
