@@ -8,10 +8,11 @@ module Compat.FedWikiImport exposing
 
 import AppModel as AM
 import Compat.ModelAPI as CAPI
+import Dict
 import Json.Decode as D exposing (Decoder)
 import Json.Encode as E
-import Model exposing (Id)
-import ModelAPI exposing (currentMapId)
+import Model exposing (AssocProps, DisplayMode(..), Id, MapItem, MapItems, MapProps(..), Rectangle, TopicProps)
+import ModelAPI exposing (currentMapId, updateMaps)
 import String
 import Utils
 
@@ -96,8 +97,12 @@ importPage value model0 =
                 ( model1, titleId ) =
                     CAPI.createTopicAndAddToMap "empty" Nothing mid model0
 
+                -- Set display mode to WhiteBox immediately after creation
+                model1a =
+                    setWhiteBoxOnCurrentMap titleId model1
+
                 ( model2, childMid ) =
-                    CAPI.ensureChildMap titleId model1
+                    CAPI.ensureChildMap titleId model1a
 
                 -- no story items on error; still persist meta
                 model3 =
@@ -132,9 +137,13 @@ importPage value model0 =
                 ( model1, titleId ) =
                     CAPI.createTopicAndAddToMap titleLabel Nothing mid model0
 
+                -- Set display mode to WhiteBox immediately after creation
+                model1a =
+                    setWhiteBoxOnCurrentMap titleId model1
+
                 -- 2) Ensure the container has a child map
                 ( model2, childMid ) =
-                    CAPI.ensureChildMap titleId model1
+                    CAPI.ensureChildMap titleId model1a
 
                 -- 3) Create topics for each story item inside the CHILD map
                 step :
@@ -180,7 +189,7 @@ importPage value model0 =
 
                 -- Debug logging
                 _ =
-                    Utils.info "@fedwiki.import.structured"
+                    Utils.info "fedwiki.import.structured"
                         { containerId = titleId
                         , storyCount = List.length storyIds
                         }
@@ -205,3 +214,47 @@ encodeFwMeta containerId storyItemIds =
             [ ( "containerId", E.int containerId )
             , ( "storyItemIds", E.list E.int storyItemIds )
             ]
+
+
+
+{- Helper: immediately flip the freshly created title item to Container WhiteBox
+   on the *current* map (the same map we just added it to).
+-}
+
+
+setWhiteBoxOnCurrentMap : Id -> AM.Model -> AM.Model
+setWhiteBoxOnCurrentMap tid model =
+    let
+        mid =
+            currentMapId model
+
+        maps1 =
+            updateMaps mid
+                (\m ->
+                    { m
+                        | items =
+                            Dict.update tid
+                                (\maybeItem ->
+                                    maybeItem
+                                        |> Maybe.map
+                                            (\item ->
+                                                case item.props of
+                                                    MapTopic p ->
+                                                        { item
+                                                            | props =
+                                                                MapTopic
+                                                                    { p
+                                                                        | displayMode = Container Model.WhiteBox
+                                                                    }
+                                                        }
+
+                                                    _ ->
+                                                        item
+                                            )
+                                )
+                                m.items
+                    }
+                )
+                model.maps
+    in
+    { model | maps = maps1 }

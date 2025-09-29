@@ -5,7 +5,7 @@ import Compat.ModelAPI exposing (currentMapIdOf, getMapItemById)
 import Config exposing (..)
 import Dict
 import Html exposing (Attribute, Html, div, input, textarea)
-import Html.Attributes exposing (attribute, class, id, style, value)
+import Html.Attributes as Attr exposing (attribute, class, id, style, value)
 import Html.Events exposing (on, onBlur, onInput)
 import IconMenuAPI exposing (viewTopicIcon)
 import Json.Decode as D
@@ -386,33 +386,60 @@ isTargeted topicId mapId model =
 viewTopic : TopicInfo -> TopicProps -> MapPath -> Model -> Html Msg
 viewTopic topic props mapPath model =
     let
-        topicFunc =
-            case effectiveDisplayMode topic.id props.displayMode model of
-                Monad Detail ->
-                    detailTopic
+        -- decide final mode
+        mode1 =
+            effectiveDisplayMode topic.id props.displayMode model
+
+        -- choose renderer + a name we can expose in the DOM for quick checks
+        ( topicFunc, rendererName ) =
+            case mode1 of
+                Container WhiteBox ->
+                    ( whiteBoxTopic, "whiteBoxTopic" )
 
                 Container BlackBox ->
-                    blackBoxTopic
-
-                Container WhiteBox ->
-                    whiteBoxTopic
+                    ( blackBoxTopic, "blackBoxTopic" )
 
                 Container Unboxed ->
-                    unboxedTopic
+                    ( unboxedTopic, "unboxedTopic" )
+
+                Monad Detail ->
+                    ( detailTopic, "detailTopic" )
 
                 _ ->
-                    -- fallback if ever called; keep labelTopic safe
-                    labelTopic
+                    ( labelTopic, "labelTopic" )
 
-        ( style, children ) =
+        -- renderer output (additional attrs + children)
+        ( styleFromFunc, childrenFromFunc ) =
             topicFunc topic props mapPath model
+
+        -- IMPORTANT: keep htmlTopicAttr (listeners/ids) and the dragHandle child
+        -- Attribute order: base position/size -> mode-dependent visuals -> renderer extras -> diagnostics
+        finalAttrs =
+            htmlTopicAttr topic.id mapPath
+                ++ topicStyleWithMode topic.id mode1 model
+                ++ styleFromFunc
+                ++ [ Attr.attribute "data-mode0" (displayModeToString props.displayMode)
+                   , Attr.attribute "data-mode1" (displayModeToString mode1)
+                   , Attr.attribute "data-renderer" rendererName
+                   , boolAttr "data-isFedWikiPage" (isFedWikiPage topic.id model)
+                   ]
     in
-    div
-        (htmlTopicAttr topic.id mapPath
-            ++ topicStyle topic.id model
-            ++ style
+    Html.div finalAttrs (dragHandle topic.id mapPath :: childrenFromFunc)
+
+
+
+-- Helper: turn a Bool into a data-* attribute value
+
+
+boolAttr : String -> Bool -> Html.Attribute msg
+boolAttr name value =
+    Attr.attribute name
+        (if value then
+            "true"
+
+         else
+            "false"
         )
-        (dragHandle topic.id mapPath :: children)
 
 
 {-| Extract the page title from Model.fedWikiRaw.
@@ -480,25 +507,93 @@ isFedWikiPage topicId model =
 
 
 effectiveDisplayMode : Id -> DisplayMode -> Model -> DisplayMode
-effectiveDisplayMode topicId displayMode model =
+effectiveDisplayMode topicId incoming model =
     let
         isLimbo =
             model.search.menu == Open (Just topicId)
-    in
-    if isFedWikiPage topicId model then
-        info "isFedWikiPage -> forcing WhiteBox" topicId
-            |> (\_ -> Container WhiteBox)
 
-    else if isLimbo then
-        case displayMode of
-            Monad _ ->
-                Monad Detail
+        isFedWiki =
+            isFedWikiPage topicId model
 
-            Container _ ->
+        decided : DisplayMode
+        decided =
+            if isFedWiki then
                 Container WhiteBox
 
-    else
-        displayMode
+            else if isLimbo then
+                case incoming of
+                    Monad _ ->
+                        Monad Detail
+
+                    Container _ ->
+                        Container WhiteBox
+
+            else
+                incoming
+
+        -- one structured log per call; no branches, no early returns
+        _ =
+            info "effectiveDisplayMode"
+                ( topicId
+                , { isFedWiki = isFedWiki
+                  , isLimbo = isLimbo
+                  , incoming = displayModeToString incoming
+                  , result = displayModeToString decided
+                  }
+                )
+    in
+    decided
+
+
+displayModeToString : DisplayMode -> String
+displayModeToString mode =
+    case mode of
+        Monad Detail ->
+            "Monad(Detail)"
+
+        Monad LabelOnly ->
+            "Monad(LabelOnly)"
+
+        Container BlackBox ->
+            "Container(BlackBox)"
+
+        Container WhiteBox ->
+            "Container(WhiteBox)"
+
+        Container Unboxed ->
+            "Container(Unboxed)"
+
+
+
+-- base styles (pos/size/etc.) that do NOT depend on mode
+
+
+baseTopicStyles : Id -> Model -> List (Html.Attribute Msg)
+baseTopicStyles tid model =
+    topicStyle tid model
+
+
+
+-- keep your existing base style for now
+-- visuals that DO depend on the chosen mode
+
+
+displayModeStyles : DisplayMode -> List (Html.Attribute Msg)
+displayModeStyles mode =
+    case mode of
+        Container WhiteBox ->
+            [ Attr.style "background" "white !important"
+            , Attr.style "border" "1px solid #ddd !important"
+            , Attr.style "border-radius" "6px"
+            ]
+
+        Container BlackBox ->
+            [ Attr.style "background" "#222 !important"
+            , Attr.style "color" "#fff !important"
+            ]
+
+        _ ->
+            []
 
 
 whiteBoxStyle : Id -> Rectangle -> MapId -> Model -> List (Attribute Msg)
@@ -689,11 +784,23 @@ blackBoxTopic topic props mapPath model =
 whiteBoxTopic : TopicInfo -> TopicProps -> MapPath -> Model -> TopicRendering
 whiteBoxTopic topic props mapPath model =
     let
-        ( style, children ) =
+        ( styleLabel, childrenLabel ) =
             labelTopic topic props mapPath model
+
+        whiteChrome =
+            [ Attr.style "background" "white !important"
+            , Attr.style "border" "1px solid #ddd !important"
+            , Attr.style "border-radius" "6px"
+            ]
+
+        scream =
+            [ Attr.style "outline" "4px solid magenta !important"
+            , Attr.style "box-shadow" "0 0 0 3px rgba(255,0,255,0.35) inset !important"
+            , Attr.attribute "data-renderer" "whiteBoxTopic"
+            ]
     in
-    ( style
-    , children
+    ( styleLabel ++ whiteChrome ++ scream
+    , childrenLabel
         ++ mapItemCount topic.id props model
         ++ [ viewMap topic.id mapPath model ]
     )
@@ -935,6 +1042,11 @@ topicStyle id model =
         else
             "2"
     ]
+
+
+topicStyleWithMode : Id -> DisplayMode -> Model -> List (Html.Attribute Msg)
+topicStyleWithMode tid mode model =
+    baseTopicStyles tid model ++ displayModeStyles mode
 
 
 selectionStyle : Id -> MapId -> Model -> List (Attribute Msg)

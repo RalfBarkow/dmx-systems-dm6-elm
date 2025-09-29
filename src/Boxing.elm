@@ -155,20 +155,43 @@ unboxTopic containerItem targetItems model =
         ( topicToInsert, abort ) =
             case targetItems |> Dict.get containerItem.id of
                 Just item ->
-                    -- if map item exists (= was revealed before) ...
-                    -- 1) set it to "pinned" unless it is hidden
-                    -- 2) abort further unboxing if it's display mode is BlackBox or WhiteBox
+                    -- Item already exists on target map.
+                    -- If it's a container, force WhiteBox unless it's explicitly BlackBox.
                     let
+                        item1 =
+                            if hasMap containerItem.id model.maps then
+                                case item.props of
+                                    MapTopic props ->
+                                        case props.displayMode of
+                                            Container BlackBox ->
+                                                item
+
+                                            -- respect BlackBox
+                                            Container WhiteBox ->
+                                                item
+
+                                            -- already WhiteBox
+                                            _ ->
+                                                setWhiteBox item
+
+                                    _ ->
+                                        item
+
+                            else
+                                item
+
+                        item2 =
+                            { item1 | hidden = False, pinned = not item1.hidden }
+
                         _ =
-                            info "unboxTopic" { item | hidden = False, pinned = not item.hidden }
+                            info "unboxTopic" item2
                     in
-                    ( { item | hidden = False, pinned = not item.hidden }, isAbort item )
+                    ( item2, isAbort item2 )
 
                 Nothing ->
-                    -- by default (when no map item exists) an unboxed container will also be unboxed
-                    -- FIXME: set item's parentAssocId?
+                    -- New on target map: containers appear as WhiteBox by default.
                     if hasMap containerItem.id model.maps then
-                        ( setUnboxed containerItem, False )
+                        ( setWhiteBox containerItem, False )
 
                     else
                         ( containerItem, False )
@@ -181,6 +204,19 @@ unboxTopic containerItem targetItems model =
         |> Dict.insert assocToInsert.id assocToInsert
     , abort
     )
+
+
+setWhiteBox : MapItem -> MapItem
+setWhiteBox item =
+    { item
+        | props =
+            case item.props of
+                MapTopic props ->
+                    MapTopic { props | displayMode = Container WhiteBox }
+
+                MapAssoc props ->
+                    MapAssoc props
+    }
 
 
 unboxAssoc : MapItem -> MapItems -> MapItems
