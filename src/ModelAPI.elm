@@ -779,7 +779,13 @@ currentMapId model =
             mid
 
         [] ->
-            Debug.todo "ensureCurrentMap guarantees a head during runtime"
+            case Dict.keys model.maps |> List.head of
+                Just firstId ->
+                    firstId
+
+                Nothing ->
+                    -- Should not happen after init; treat as root.
+                    0
 
 
 normalizeMapId : Model -> MapId -> MapId
