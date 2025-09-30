@@ -5,8 +5,8 @@ import Compat.ModelAPI exposing (currentMapIdOf, getMapItemById)
 import Config exposing (..)
 import Dict
 import Html exposing (Attribute, Html, div, input, textarea)
-import Html.Attributes as Attr exposing (attribute, class, id, style, value)
-import Html.Events exposing (on, onBlur, onInput)
+import Html.Attributes as Attr
+import Html.Events as HE exposing (on, onBlur, onInput)
 import IconMenuAPI exposing (viewTopicIcon)
 import Json.Decode as D
 import Model exposing (..)
@@ -31,32 +31,6 @@ import Search exposing (ResultMenu(..))
 import String exposing (fromFloat, fromInt, toLower, trim)
 import Svg exposing (Svg, circle, g, path, rect, svg)
 import Svg.Attributes as SA
-    exposing
-        ( cx
-        , cy
-        , d
-        , dominantBaseline
-        , fill
-        , fillOpacity
-        , fontFamily
-        , fontSize
-        , fontWeight
-        , height
-        , pointerEvents
-        , r
-        , stroke
-        , strokeDasharray
-        , strokeWidth
-        , textAnchor
-        , transform
-        , width
-        , x
-        , x1
-        , x2
-        , y
-        , y1
-        , y2
-        )
 import Svg.Events as SE
 import Utils exposing (..)
 
@@ -117,14 +91,14 @@ viewMap mapId mapPath model =
                 ++ limboTopic mapId model
             )
         , svg
-            ([ width svgSize.w, height svgSize.h ] ++ svgStyle)
+            ([ SA.width svgSize.w, SA.height svgSize.h ] ++ svgStyle)
             [ g (gAttr mapId mapRect model) (assocsSvg ++ topicsSvg ++ viewLimboAssoc mapId model) ]
         ]
 
 
 gAttr : MapId -> Rectangle -> Model -> List (Attribute Msg)
 gAttr _ mapRect _ =
-    [ transform <|
+    [ SA.transform <|
         "translate("
             ++ fromFloat -mapRect.x1
             ++ " "
@@ -314,12 +288,12 @@ viewTopicSvg topic props mapPath model =
         shadowNodes =
             if selected then
                 [ circle
-                    [ cx cxStr
-                    , cy cyStr
-                    , r rStr
-                    , fill "black"
-                    , fillOpacity "0.20"
-                    , transform "translate(5,5)"
+                    [ SA.cx cxStr
+                    , SA.cy cyStr
+                    , SA.r rStr
+                    , SA.fill "black"
+                    , SA.fillOpacity "0.20"
+                    , SA.transform "translate(5,5)"
                     ]
                     []
                 ]
@@ -331,33 +305,33 @@ viewTopicSvg topic props mapPath model =
         mainNodes =
             [ -- invisible square hitbox so label/circle are easy to grab
               rect
-                [ x (fromFloat (props.pos.x - rVal))
-                , y (fromFloat (props.pos.y - rVal))
-                , width (fromFloat (rVal * 2))
-                , height (fromFloat (rVal * 2))
-                , fill "transparent"
-                , pointerEvents "all" -- << use Svg.Attributes.pointerEvents
+                [ SA.x (fromFloat (props.pos.x - rVal))
+                , SA.y (fromFloat (props.pos.y - rVal))
+                , SA.width (fromFloat (rVal * 2))
+                , SA.height (fromFloat (rVal * 2))
+                , SA.fill "transparent"
+                , SA.pointerEvents "all" -- << use Svg.Attributes.pointerEvents
                 ]
                 []
             , circle
-                [ cx cxStr
-                , cy cyStr
-                , r rStr
-                , fill "white"
-                , stroke "black"
-                , strokeWidth (fromFloat topicBorderWidth ++ "px")
-                , strokeDasharray dash
+                [ SA.cx cxStr
+                , SA.cy cyStr
+                , SA.r rStr
+                , SA.fill "white"
+                , SA.stroke "black"
+                , SA.strokeWidth (fromFloat topicBorderWidth ++ "px")
+                , SA.strokeDasharray dash
                 ]
                 []
             , Svg.text_
-                [ x cxStr
-                , y cyStr
-                , textAnchor "middle"
-                , dominantBaseline "central"
-                , fontFamily mainFont
-                , fontSize (fromInt contentFontSize ++ "px")
-                , fontWeight topicLabelWeight
-                , fill "black"
+                [ SA.x cxStr
+                , SA.y cyStr
+                , SA.textAnchor "middle"
+                , SA.dominantBaseline "central"
+                , SA.fontFamily mainFont
+                , SA.fontSize (fromInt contentFontSize ++ "px")
+                , SA.fontWeight topicLabelWeight
+                , SA.fill "black"
                 ]
                 [ Svg.text mark ]
             , Svg.title [] [ Svg.text (getTopicLabel topic) ]
@@ -624,13 +598,13 @@ whiteBoxStyle topicId rect mapId model =
         r =
             fromInt whiteBoxRadius ++ "px"
     in
-    [ style "position" "absolute"
-    , style "left" <| fromFloat -topicBorderWidth ++ "px"
-    , style "top" <| fromFloat (topicSize.h - 2 * topicBorderWidth) ++ "px"
-    , style "width" <| fromFloat width ++ "px"
-    , style "height" <| fromFloat height ++ "px"
-    , style "border-radius" <| "0 " ++ r ++ " " ++ r ++ " " ++ r
-    , style "overflow" "hidden"
+    [ Attr.style "position" "absolute"
+    , Attr.style "left" <| fromFloat -topicBorderWidth ++ "px"
+    , Attr.style "top" <| fromFloat (topicSize.h - 2 * topicBorderWidth) ++ "px"
+    , Attr.style "width" <| fromFloat width ++ "px"
+    , Attr.style "height" <| fromFloat height ++ "px"
+    , Attr.style "border-radius" <| "0 " ++ r ++ " " ++ r ++ " " ++ r
+    , Attr.style "overflow" "hidden"
     ]
         ++ topicBorderStyle topicId mapId model
         ++ selectionStyle topicId mapId model
@@ -658,8 +632,8 @@ labelTopicHtml topic props mapId model =
         textElem =
             if isEdit then
                 input
-                    ([ id <| "dmx-input-" ++ fromInt topic.id ++ "-" ++ fromInt mapId
-                     , value topic.text
+                    ([ Attr.id <| "dmx-input-" ++ fromInt topic.id ++ "-" ++ fromInt mapId
+                     , Attr.value topic.text
                      , onInput (Edit << OnTextInput)
                      , onBlur (Edit EditEnd)
                      , onEnterOrEsc (Edit EditEnd)
@@ -693,7 +667,7 @@ detailTopic topic props mapPath model =
         textElem =
             if isEdit then
                 textarea
-                    ([ id <| "dmx-input-" ++ fromInt topic.id ++ "-" ++ fromInt mapId
+                    ([ Attr.id <| "dmx-input-" ++ fromInt topic.id ++ "-" ++ fromInt mapId
                      , onInput (Edit << OnTextareaInput)
                      , onBlur (Edit EditEnd)
                      , onEsc (Edit EditEnd)
@@ -725,9 +699,9 @@ detailTopic topic props mapPath model =
 
 detailTopicStyle : TopicProps -> List (Attribute Msg)
 detailTopicStyle { pos } =
-    [ style "display" "flex"
-    , style "left" <| fromFloat (pos.x - topicW2) ++ "px"
-    , style "top" <| fromFloat (pos.y - topicH2) ++ "px"
+    [ Attr.style "display" "flex"
+    , Attr.style "left" <| fromFloat (pos.x - topicW2) ++ "px"
+    , Attr.style "top" <| fromFloat (pos.y - topicH2) ++ "px"
     ]
 
 
@@ -737,11 +711,11 @@ detailTextStyle topicId mapId model =
         r =
             fromInt topicRadius ++ "px"
     in
-    [ style "font-size" <| fromInt contentFontSize ++ "px"
-    , style "width" <| fromFloat topicDetailMaxWidth ++ "px"
-    , style "line-height" <| fromFloat topicLineHeight
-    , style "padding" <| fromInt topicDetailPadding ++ "px"
-    , style "border-radius" <| "0 " ++ r ++ " " ++ r ++ " " ++ r
+    [ Attr.style "font-size" <| fromInt contentFontSize ++ "px"
+    , Attr.style "width" <| fromFloat topicDetailMaxWidth ++ "px"
+    , Attr.style "line-height" <| fromFloat topicLineHeight
+    , Attr.style "padding" <| fromInt topicDetailPadding ++ "px"
+    , Attr.style "border-radius" <| "0 " ++ r ++ " " ++ r ++ " " ++ r
     ]
         ++ topicBorderStyle topicId mapId model
         ++ selectionStyle topicId mapId model
@@ -749,10 +723,10 @@ detailTextStyle topicId mapId model =
 
 detailTextViewStyle : List (Attribute Msg)
 detailTextViewStyle =
-    [ style "min-width" <| fromFloat (topicSize.w - topicSize.h) ++ "px"
-    , style "max-width" "max-content"
-    , style "white-space" "pre-wrap"
-    , style "pointer-events" "none"
+    [ Attr.style "min-width" <| fromFloat (topicSize.w - topicSize.h) ++ "px"
+    , Attr.style "max-width" "max-content"
+    , Attr.style "white-space" "pre-wrap"
+    , Attr.style "pointer-events" "none"
     ]
 
 
@@ -767,12 +741,12 @@ detailTextEditStyle topicId mapId model =
                 Nothing ->
                     0
     in
-    [ style "position" "relative"
-    , style "top" <| fromFloat -topicBorderWidth ++ "px"
-    , style "height" <| fromFloat height ++ "px"
-    , style "font-family" mainFont -- <textarea> default is "monospace"
-    , style "border-color" "black" -- <textarea> default is some lightgray
-    , style "resize" "none"
+    [ Attr.style "position" "relative"
+    , Attr.style "top" <| fromFloat -topicBorderWidth ++ "px"
+    , Attr.style "height" <| fromFloat height ++ "px"
+    , Attr.style "font-family" mainFont -- <textarea> default is "monospace"
+    , Attr.style "border-color" "black" -- <textarea> default is some lightgray
+    , Attr.style "resize" "none"
     ]
 
 
@@ -895,12 +869,12 @@ childCount topicId model =
 
 htmlTopicAttr : Id -> MapPath -> List (Attribute Msg)
 htmlTopicAttr id mapPath =
-    [ class "dmx-topic topic monad"
-    , attribute "data-id" (fromInt id)
-    , attribute "data-path" (fromPath mapPath)
-    , style "cursor" "move"
-    , on "mousedown" (D.map (Mouse << Mouse.DownOnItem topicCls id mapPath) posDecoder)
-    , on "pointerdown" (D.map (Mouse << Mouse.DownOnItem topicCls id mapPath) posDecoder)
+    [ Attr.class "dmx-topic topic monad"
+    , Attr.attribute "data-id" (fromInt id)
+    , Attr.attribute "data-path" (fromPath mapPath)
+    , Attr.style "cursor" "move"
+    , SE.on "mousedown" (D.map (Mouse << Mouse.DownOnItem topicCls id mapPath) posDecoder)
+    , SE.on "pointerdown" (D.map (Mouse << Mouse.DownOnItem topicCls id mapPath) posDecoder)
     ]
 
 
@@ -1051,14 +1025,14 @@ topicStyle id model =
                 _ ->
                     False
     in
-    [ style "position" "absolute"
-    , style "opacity" <|
+    [ Attr.style "position" "absolute"
+    , Attr.style "opacity" <|
         if isLimbo then
             ".5"
 
         else
             "1"
-    , style "z-index" <|
+    , Attr.style "z-index" <|
         if isDragging then
             "1"
 
@@ -1070,7 +1044,7 @@ topicStyle id model =
 selectionStyle : Id -> MapId -> Model -> List (Attribute Msg)
 selectionStyle topicId mapId model =
     if isSelected topicId mapId model then
-        [ style "box-shadow" "gray 5px 5px 5px" ]
+        [ Attr.style "box-shadow" "gray 5px 5px 5px" ]
 
     else
         []
@@ -1090,20 +1064,20 @@ topicFlexboxStyle topic props mapId model =
                 _ ->
                     r12
     in
-    [ style "display" "flex"
-    , style "align-items" "center"
-    , style "gap" "8px"
-    , style "width" <| fromFloat topicSize.w ++ "px"
-    , style "height" <| fromFloat topicSize.h ++ "px"
-    , style "border-radius" <| r12 ++ " " ++ r12 ++ " " ++ r34 ++ " " ++ r34
+    [ Attr.style "display" "flex"
+    , Attr.style "align-items" "center"
+    , Attr.style "gap" "8px"
+    , Attr.style "width" <| fromFloat topicSize.w ++ "px"
+    , Attr.style "height" <| fromFloat topicSize.h ++ "px"
+    , Attr.style "border-radius" <| r12 ++ " " ++ r12 ++ " " ++ r34 ++ " " ++ r34
     ]
         ++ topicBorderStyle topic.id mapId model
 
 
 topicPosStyle : TopicProps -> List (Attribute Msg)
 topicPosStyle { pos } =
-    [ style "left" <| fromFloat (pos.x - topicW2) ++ "px"
-    , style "top" <| fromFloat (pos.y - topicH2) ++ "px"
+    [ Attr.style "left" <| fromFloat (pos.x - topicW2) ++ "px"
+    , Attr.style "top" <| fromFloat (pos.y - topicH2) ++ "px"
     ]
 
 
@@ -1121,61 +1095,61 @@ topicIconBoxStyle props =
                 _ ->
                     r1
     in
-    [ style "flex" "none"
-    , style "width" <| fromFloat topicSize.h ++ "px"
-    , style "height" <| fromFloat topicSize.h ++ "px"
-    , style "border-radius" <| r1 ++ " 0 0 " ++ r4
-    , style "background-color" "black"
-    , style "pointer-events" "none"
+    [ Attr.style "flex" "none"
+    , Attr.style "width" <| fromFloat topicSize.h ++ "px"
+    , Attr.style "height" <| fromFloat topicSize.h ++ "px"
+    , Attr.style "border-radius" <| r1 ++ " 0 0 " ++ r4
+    , Attr.style "background-color" "black"
+    , Attr.style "pointer-events" "none"
     ]
 
 
 detailTopicIconBoxStyle : List (Attribute Msg)
 detailTopicIconBoxStyle =
     -- icon box correction as detail topic has no border, in contrast to label topic
-    [ style "padding-left" <| fromFloat topicBorderWidth ++ "px"
-    , style "width" <| fromFloat (topicSize.h - topicBorderWidth) ++ "px"
+    [ Attr.style "padding-left" <| fromFloat topicBorderWidth ++ "px"
+    , Attr.style "width" <| fromFloat (topicSize.h - topicBorderWidth) ++ "px"
     ]
 
 
 topicLabelStyle : List (Attribute Msg)
 topicLabelStyle =
-    [ style "font-size" <| fromInt contentFontSize ++ "px"
-    , style "font-weight" topicLabelWeight
-    , style "overflow" "hidden"
-    , style "text-overflow" "ellipsis"
-    , style "white-space" "nowrap"
-    , style "pointer-events" "none"
+    [ Attr.style "font-size" <| fromInt contentFontSize ++ "px"
+    , Attr.style "font-weight" topicLabelWeight
+    , Attr.style "overflow" "hidden"
+    , Attr.style "text-overflow" "ellipsis"
+    , Attr.style "white-space" "nowrap"
+    , Attr.style "pointer-events" "none"
     ]
 
 
 topicInputStyle : List (Attribute Msg)
 topicInputStyle =
-    [ style "font-family" mainFont -- Default for <input> is "-apple-system" (on Mac)
-    , style "font-size" <| fromInt contentFontSize ++ "px"
-    , style "font-weight" topicLabelWeight
-    , style "width" "100%"
-    , style "position" "relative"
-    , style "left" "-4px"
-    , style "pointer-events" "initial"
+    [ Attr.style "font-family" mainFont -- Default for <input> is "-apple-system" (on Mac)
+    , Attr.style "font-size" <| fromInt contentFontSize ++ "px"
+    , Attr.style "font-weight" topicLabelWeight
+    , Attr.style "width" "100%"
+    , Attr.style "position" "relative"
+    , Attr.style "left" "-4px"
+    , Attr.style "pointer-events" "initial"
     ]
 
 
 blackBoxStyle : List (Attribute Msg)
 blackBoxStyle =
-    [ style "pointer-events" "none" ]
+    [ Attr.style "pointer-events" "none" ]
 
 
 ghostTopicStyle : TopicInfo -> MapId -> Model -> List (Attribute Msg)
 ghostTopicStyle topic mapId model =
-    [ style "position" "absolute"
-    , style "left" <| fromInt blackBoxOffset ++ "px"
-    , style "top" <| fromInt blackBoxOffset ++ "px"
-    , style "width" <| fromFloat topicSize.w ++ "px"
-    , style "height" <| fromFloat topicSize.h ++ "px"
-    , style "border-radius" <| fromInt topicRadius ++ "px"
-    , style "pointer-events" "none"
-    , style "z-index" "-1" -- behind topic
+    [ Attr.style "position" "absolute"
+    , Attr.style "left" <| fromInt blackBoxOffset ++ "px"
+    , Attr.style "top" <| fromInt blackBoxOffset ++ "px"
+    , Attr.style "width" <| fromFloat topicSize.w ++ "px"
+    , Attr.style "height" <| fromFloat topicSize.h ++ "px"
+    , Attr.style "border-radius" <| fromInt topicRadius ++ "px"
+    , Attr.style "pointer-events" "none"
+    , Attr.style "z-index" "-1" -- behind topic
     ]
         ++ topicBorderStyle topic.id mapId model
         ++ selectionStyle topic.id mapId model
@@ -1183,9 +1157,9 @@ ghostTopicStyle topic mapId model =
 
 itemCountStyle : List (Attribute Msg)
 itemCountStyle =
-    [ style "font-size" <| fromInt contentFontSize ++ "px"
-    , style "position" "absolute"
-    , style "left" "calc(100% + 12px)"
+    [ Attr.style "font-size" <| fromInt contentFontSize ++ "px"
+    , Attr.style "position" "absolute"
+    , Attr.style "left" "calc(100% + 12px)"
     ]
 
 
@@ -1205,15 +1179,15 @@ topicBorderStyle id mapId model =
                 _ ->
                     False
     in
-    [ style "border-width" <| fromFloat topicBorderWidth ++ "px"
-    , style "border-style" <|
+    [ Attr.style "border-width" <| fromFloat topicBorderWidth ++ "px"
+    , Attr.style "border-style" <|
         if targeted then
             "dashed"
 
         else
             "solid"
-    , style "box-sizing" "border-box"
-    , style "background-color" "white"
+    , Attr.style "box-sizing" "border-box"
+    , Attr.style "background-color" "white"
     ]
 
 
@@ -1234,17 +1208,17 @@ isTarget topicId mapId target =
 
 topicLayerStyle : Rectangle -> List (Attribute Msg)
 topicLayerStyle mapRect =
-    [ style "position" "absolute"
-    , style "left" <| fromFloat -mapRect.x1 ++ "px"
-    , style "top" <| fromFloat -mapRect.y1 ++ "px"
+    [ Attr.style "position" "absolute"
+    , Attr.style "left" <| fromFloat -mapRect.x1 ++ "px"
+    , Attr.style "top" <| fromFloat -mapRect.y1 ++ "px"
     ]
 
 
 svgStyle : List (Attribute Msg)
 svgStyle =
-    [ style "position" "absolute" -- occupy entire window height (instead 150px default height)
-    , style "top" "0"
-    , style "left" "0"
+    [ Attr.style "position" "absolute" -- occupy entire window height (instead 150px default height)
+    , Attr.style "top" "0"
+    , Attr.style "left" "0"
     ]
 
 
@@ -1261,8 +1235,8 @@ taxiLine assoc pos1 pos2 =
             xm =
                 (pos1.x + pos2.x) / 2
         in
-        path
-            (d ("M " ++ fromFloat xm ++ " " ++ fromFloat pos1.y ++ " V " ++ fromFloat pos2.y)
+        Svg.path
+            (SA.d ("M " ++ fromFloat xm ++ " " ++ fromFloat pos1.y ++ " V " ++ fromFloat pos2.y)
                 :: lineStyle assoc
             )
             []
@@ -1273,8 +1247,8 @@ taxiLine assoc pos1 pos2 =
             ym =
                 (pos1.y + pos2.y) / 2
         in
-        path
-            (d ("M " ++ fromFloat pos1.x ++ " " ++ fromFloat ym ++ " H " ++ fromFloat pos2.x)
+        Svg.path
+            (SA.d ("M " ++ fromFloat pos1.x ++ " " ++ fromFloat ym ++ " H " ++ fromFloat pos2.x)
                 :: lineStyle assoc
             )
             []
@@ -1340,8 +1314,8 @@ taxiLine assoc pos1 pos2 =
             r =
                 fromFloat assocRadius
         in
-        path
-            (d
+        Svg.path
+            (SA.d
                 ("M "
                     ++ fromFloat pos1.x
                     ++ " "
@@ -1380,10 +1354,10 @@ taxiLine assoc pos1 pos2 =
 
 lineStyle : Maybe AssocInfo -> List (Attribute Msg)
 lineStyle assoc =
-    [ stroke assocColor
-    , strokeWidth <| fromFloat assocWidth ++ "px"
-    , strokeDasharray <| lineDasharray assoc
-    , fill "none"
+    [ SA.stroke assocColor
+    , SA.strokeWidth <| fromFloat assocWidth ++ "px"
+    , SA.strokeDasharray <| lineDasharray assoc
+    , SA.fill "none"
     ]
 
 
@@ -1435,10 +1409,10 @@ monadMark title =
         "•"
 
     else if String.length word >= 1 then
-        word |> take (min 3 (String.length word))
+        word |> take (Basics.min 3 (String.length word))
 
     else
-        take (min 2 (String.length trimmed)) trimmed
+        take (Basics.min 2 (String.length trimmed)) trimmed
 
 
 posDecoder : D.Decoder Point
@@ -1451,21 +1425,21 @@ posDecoder =
 dragHandle : Id -> MapPath -> Html Msg
 dragHandle id mapPath =
     div
-        [ attribute "data-drag-handle" "1"
-        , attribute "title" "Drag handle"
-        , style "position" "absolute"
-        , style "left" "-6px"
-        , style "top" "-6px"
-        , style "width" "12px"
-        , style "height" "12px"
-        , style "border" "2px solid #f40"
-        , style "border-radius" "50%"
-        , style "background" "rgba(255,64,0,0.2)"
-        , style "cursor" "move"
-        , style "z-index" "999"
-        , on "mousedown" (D.map (Mouse << Mouse.DownOnItem topicCls id mapPath) posDecoder)
-        , on "mouseenter" (D.succeed (Mouse (Mouse.Over topicCls id mapPath)))
-        , on "mousemove" (D.succeed (Mouse (Mouse.Over topicCls id mapPath)))
-        , on "mouseup" (D.succeed (Mouse Mouse.Up))
+        [ Attr.attribute "data-drag-handle" "1"
+        , Attr.attribute "title" "Drag handle"
+        , Attr.style "position" "absolute"
+        , Attr.style "left" "-6px"
+        , Attr.style "top" "-6px"
+        , Attr.style "width" "12px"
+        , Attr.style "height" "12px"
+        , Attr.style "border" "2px solid #f40"
+        , Attr.style "border-radius" "50%"
+        , Attr.style "background" "rgba(255,64,0,0.2)"
+        , Attr.style "cursor" "move"
+        , Attr.style "z-index" "999"
+        , HE.on "mousedown" (D.map (Mouse << Mouse.DownOnItem topicCls id mapPath) posDecoder)
+        , HE.on "mouseenter" (D.succeed (Mouse (Mouse.Over topicCls id mapPath)))
+        , HE.on "mousemove" (D.succeed (Mouse (Mouse.Over topicCls id mapPath)))
+        , HE.on "mouseup" (D.succeed (Mouse Mouse.Up))
         ]
         []
