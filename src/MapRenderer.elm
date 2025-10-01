@@ -440,7 +440,7 @@ viewTopic topic props mapPath model =
                    , boolAttr "data-isFedWikiPage" (isFedWikiPage topic.id model)
                    ]
     in
-    Html.div finalAttrs (dragHandle topic.id mapPath :: childrenFromRenderer)
+    Html.div finalAttrs childrenFromRenderer
 
 
 {-| Extract the page title from Model.fedWikiRaw.
@@ -1468,27 +1468,3 @@ svgTopicHandlers id mapPath =
     , SE.on "pointerup" (D.succeed (Mouse Mouse.Up))
     , SE.on "mouseup" (D.succeed (Mouse Mouse.Up))
     ]
-
-
-dragHandle : Id -> MapPath -> Html Msg
-dragHandle id mapPath =
-    div
-        [ Attr.attribute "data-drag-handle" "1"
-        , Attr.attribute "title" "Drag handle"
-        , Attr.style "pointer-events" "auto" -- override
-        , Attr.style "position" "absolute"
-        , Attr.style "left" "-6px"
-        , Attr.style "top" "-6px"
-        , Attr.style "width" "12px"
-        , Attr.style "height" "12px"
-        , Attr.style "border" "2px solid #f40"
-        , Attr.style "border-radius" "50%"
-        , Attr.style "background" "rgba(255,64,0,0.2)"
-        , Attr.style "cursor" "move"
-        , Attr.style "z-index" "999"
-        , HE.on "mousedown" (D.map (Mouse << Mouse.DownOnItem topicCls id mapPath) posDecoder)
-        , HE.on "mouseenter" (D.succeed (Mouse (Mouse.Over topicCls id mapPath)))
-        , HE.on "mousemove" (D.succeed (Mouse (Mouse.Over topicCls id mapPath)))
-        , HE.on "mouseup" (D.succeed (Mouse Mouse.Up))
-        ]
-        []
