@@ -4,75 +4,29 @@ module Feature.Move exposing
     , MoveArgs
     , Report
     , moveTopicToMap
+    , moveTopicToMap_
     )
 
-{-| A small “Move” library extracted from Main.
-It uses dictionary passing (Deps) so it knows nothing about your Model internals.
--}
-
--- Import your real types here (adjust module names as needed)
--- import Types exposing (Id, MapId, MapPath, Point, Model, MapItem, ItemProps(..), TopicProps, DisplayMode(..), DisplayContainer(..))
--- import Model exposing (Maps) -- if you have a Maps alias
--- TEMP placeholders; delete when you wire real types:
-
-
-type alias Id =
-    Int
-
-
-type alias MapId =
-    Int
-
-
-type alias MapPath =
-    List Int
-
-
-type alias Point =
-    { x : Float, y : Float }
-
-
-type DisplayContainer
-    = WhiteBox
-    | BlackBox
-
-
-type LabelMode
-    = LabelOnly
-    | LabelAndIcon
-
-
-type DisplayMode
-    = Monad LabelMode
-    | Container DisplayContainer
-
-
-type alias TopicProps =
-    { displayMode : DisplayMode
-    , pos : Point
-    , size : { w : Float, h : Float }
-    }
-
-
-type ItemProps
-    = MapTopic TopicProps
-    | Other
-
-
-type alias MapItem =
-    { id : Id
-    , hidden : Bool
-    , props : ItemProps
-    }
-
-
-type alias Model =
-    { maps : ()
-    }
+import AppModel exposing (Model)
+import Model exposing (ContainerDisplay(..), DisplayMode(..), MapProps(..))
+import Types
+    exposing
+        ( ContainerDisplay
+        , DisplayMode
+        , Id
+        , MapId
+        , MapItem
+        , MapPath
+        , MapProps
+        , Maps
+        , MonadDisplay
+        , Point
+        , TopicProps
+        )
 
 
 
--- CONFIG (policy knobs)
+-- POLICY KNOBS
 
 
 type alias Config =
@@ -84,17 +38,13 @@ type alias Config =
 
 
 
--- All host-provided functions live here (dictionary passing).
+-- HOST DEPS
 
 
 type alias Deps =
     { createMapIfNeeded : Id -> Model -> ( Model, Bool )
-    , getTopicProps :
-        Id
-        -> MapId
-        -> Model
-        -> Maybe TopicProps -- <- was ... -> /* Maps */ a -> ...
-    , addItemToMap : Id -> ItemProps -> Id -> Model -> Model
+    , getTopicProps : Id -> MapId -> Model -> Maybe TopicProps
+    , addItemToMap : Id -> MapProps -> MapId -> Model -> Model
     , hideItem : Id -> MapId -> Model -> Model
     , setTopicPos : Id -> MapId -> Point -> Model -> Model
     , select : Id -> MapPath -> Model -> Model
@@ -102,11 +52,15 @@ type alias Deps =
     , getItem : Id -> Model -> Maybe MapItem
     , updateItem : Id -> (MapItem -> MapItem) -> Model -> Model
     , worldToLocal : Id -> Point -> Model -> Maybe Point
+    , ownerToMapId :
+        Id
+        -> Model
+        -> MapId -- NEW: map owner topic → MapId
     }
 
 
 
--- Call arguments (mirrors your current function)
+-- CALL ARGS
 
 
 type alias MoveArgs =
@@ -127,7 +81,7 @@ type alias Report =
 
 
 
--- PUBLIC API ---------------------------------------------------------------
+-- PUBLIC
 
 
 moveTopicToMap : Deps -> Config -> MoveArgs -> Model -> ( Model, Report )
@@ -160,6 +114,10 @@ moveTopicToMap deps cfg args model0 =
         props_ =
             deps.getTopicProps args.topicId args.srcMapId model2
                 |> Maybe.map (\tp -> MapTopic { tp | pos = localPos })
+
+        destMapId : MapId
+        destMapId =
+            deps.ownerToMapId args.targetId model2
     in
     case props_ of
         Nothing ->
@@ -173,7 +131,7 @@ moveTopicToMap deps cfg args model0 =
                     model2
                         |> deps.hideItem args.topicId args.srcMapId
                         |> deps.setTopicPos args.topicId args.srcMapId args.srcPos
-                        |> deps.addItemToMap args.topicId newItemProps args.targetId
+                        |> deps.addItemToMap args.topicId newItemProps destMapId
                         |> (\m ->
                                 if cfg.selectAfterMove then
                                     deps.select args.targetId args.targetMapPath m
@@ -198,15 +156,24 @@ moveTopicToMap deps cfg args model0 =
 
 
 
--- Convenience wrapper (same signature as your old function; returns only Model)
+-- Pipeline-friendly wrapper
 
 
-moveTopicToMap_ : Deps -> Config -> Id -> MapId -> Point -> Id -> MapPath -> Point -> Model -> Model
+moveTopicToMap_ :
+    Deps
+    -> Config
+    -> Id
+    -> MapId
+    -> Point
+    -> Id
+    -> MapPath
+    -> Point
+    -> Model
+    -> Model
 moveTopicToMap_ deps cfg topicId mapId origPos targetId targetPath worldPos model =
     let
         ( m, _ ) =
-            moveTopicToMap
-                deps
+            moveTopicToMap deps
                 cfg
                 { topicId = topicId
                 , srcMapId = mapId
@@ -221,7 +188,7 @@ moveTopicToMap_ deps cfg topicId mapId origPos targetId targetPath worldPos mode
 
 
 
--- HELPERS -----------------------------------------------------------------
+-- HELPERS
 
 
 promoteToWhiteBoxUnlessBlack : Bool -> MapItem -> MapItem

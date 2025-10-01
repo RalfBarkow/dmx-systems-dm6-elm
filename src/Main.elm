@@ -1,14 +1,13 @@
 module Main exposing (..)
 
--- components
-
 import AppModel exposing (..)
 import Boxing exposing (boxContainer, unboxContainer)
 import Browser
 import Browser.Dom as Dom
 import Compat.Model as CModel
 import Config exposing (..)
-import Dict
+import Dict exposing (Dict)
+import Feature.Move
 import Html exposing (Attribute, br, div, text)
 import Html.Attributes exposing (id, style)
 import IconMenuAPI exposing (updateIconMenu, viewIconMenu)
@@ -24,6 +23,7 @@ import Storage exposing (exportJSON, importJSON, modelDecoder, store, storeWith)
 import String exposing (fromFloat, fromInt)
 import Task
 import Toolbar exposing (viewToolbar)
+import Types exposing (Id, MapId, MapItem, Maps, Point)
 import UndoList
 import Utils exposing (..)
 
@@ -240,35 +240,85 @@ update msg ({ present } as undoModel) =
 
 
 moveTopicToMap : Id -> MapId -> Point -> Id -> MapPath -> Point -> Model -> Model
-moveTopicToMap topicId mapId origPos targetId targetMapPath pos model =
+moveTopicToMap topicId mapId origPos targetId targetPath dropWorld model =
     let
-        ( newModel, created ) =
-            createMapIfNeeded targetId model
-
-        newPos =
-            if created then
-                Point
-                    (topicW2 + whiteBoxPadding)
-                    (topicH2 + whiteBoxPadding)
-
-            else
-                pos
-
-        props_ =
-            getTopicProps topicId mapId newModel.maps
-                |> Maybe.andThen (\props -> Just (MapTopic { props | pos = newPos }))
+        cfg =
+            { whiteBoxPadding = 8
+            , respectBlackBox = True
+            , selectAfterMove = True
+            , autosizeAfterMove = True
+            }
     in
-    case props_ of
-        Just props ->
-            newModel
-                |> hideItem topicId mapId
-                |> setTopicPos topicId mapId origPos
-                |> addItemToMap topicId props targetId
-                |> select targetId targetMapPath
-                |> autoSize
+    Feature.Move.moveTopicToMap_ moveDeps
+        cfg
+        topicId
+        mapId
+        origPos
+        targetId
+        targetPath
+        dropWorld
+        model
 
-        Nothing ->
-            model
+
+moveDeps : Feature.Move.Deps
+moveDeps =
+    { createMapIfNeeded = createMapIfNeeded
+    , getTopicProps = \tid mid m -> getTopicProps tid mid m.maps
+    , addItemToMap = addItemToMap
+    , hideItem = hideItem
+    , setTopicPos = setTopicPos
+    , select = select
+    , autoSize = autoSize
+    , getItem = \tid m -> getMapItemById tid (activeMap m) m.maps
+    , updateItem = updateItemById
+    , worldToLocal = worldToLocalPos
+    , ownerToMapId = \ownerId _ -> ownerId
+    }
+
+
+getItemFromModel : Id -> Model -> Maybe MapItem
+getItemFromModel tid m =
+    getMapItemById tid (activeMap m) m.maps
+
+
+updateItemById : Id -> (MapItem -> MapItem) -> Model -> Model
+updateItemById targetId f model =
+    let
+        amendItems : Dict Id MapItem -> Dict Id MapItem
+        amendItems =
+            Dict.update targetId (Maybe.map f)
+
+        amendMap : Map -> Map
+        amendMap m =
+            { m | items = amendItems m.items }
+
+        activeId : MapId
+        activeId =
+            activeMap model
+
+        maps2 : Maps
+        maps2 =
+            Dict.update activeId (Maybe.map amendMap) model.maps
+    in
+    { model | maps = maps2 }
+
+
+worldToLocalPos : Id -> Point -> Model -> Maybe Point
+worldToLocalPos targetId world model =
+    getMapItemById targetId (activeMap model) model.maps
+        |> Maybe.andThen
+            (\it ->
+                case it.props of
+                    MapTopic tp ->
+                        -- naive: world relative to target’s top-left
+                        Just
+                            { x = world.x - tp.pos.x
+                            , y = world.y - tp.pos.y
+                            }
+
+                    _ ->
+                        Nothing
+            )
 
 
 createMapIfNeeded : Id -> Model -> ( Model, Bool )
