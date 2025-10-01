@@ -89,7 +89,18 @@ updateMouse msg ({ present } as undoModel) =
                     mouseMove present pos |> swap undoModel
 
         Mouse.Up ->
-            mouseUp undoModel
+            case present.mouse.dragState of
+                NoDrag ->
+                    -- Stray mouseup (e.g. click on non-draggable or release outside)
+                    ( undoModel, Cmd.none )
+
+                WaitForStartTime _ _ _ _ ->
+                    -- Released before drag engaged → cancel tentative drag
+                    ( updateDragState present NoDrag, Cmd.none )
+                        |> swap undoModel
+
+                _ ->
+                    mouseUp undoModel
 
         Mouse.Over class id mapPath ->
             ( mouseOver present class id mapPath, Cmd.none )
