@@ -6,7 +6,7 @@ import Config exposing (..)
 import Dict
 import Html exposing (Attribute, Html, div, input, textarea)
 import Html.Attributes as Attr
-import Html.Events as HE exposing (on, onBlur, onInput)
+import Html.Events as HE
 import IconMenuAPI exposing (viewTopicIcon)
 import Json.Decode as D
 import Model exposing (..)
@@ -32,6 +32,7 @@ import String exposing (fromFloat, fromInt, toLower, trim)
 import Svg exposing (Svg, circle, g, path, rect, svg)
 import Svg.Attributes as SA
 import Svg.Events as SE
+import SvgExtras exposing (cursorPointer, peAll, peNone, peStroke)
 import Utils exposing (..)
 
 
@@ -92,7 +93,35 @@ viewMap mapId mapPath model =
             )
         , svg
             ([ SA.width svgSize.w, SA.height svgSize.h ] ++ svgStyle)
-            [ g (gAttr mapId mapRect model) (assocsSvg ++ topicsSvg ++ viewLimboAssoc mapId model) ]
+            [ g (gAttr mapId mapRect model)
+                -- A) background rect: does NOT capture events (peNone)
+                ([ rect
+                    [ SA.x (String.fromFloat mapRect.x1)
+                    , SA.y (String.fromFloat mapRect.y1)
+                    , SA.width (String.fromFloat (mapRect.x2 - mapRect.x1))
+                    , SA.height (String.fromFloat (mapRect.y2 - mapRect.y1))
+                    , SA.fill "transparent"
+                    , peNone
+                    ]
+                    []
+                 ]
+                    -- B) children group: DOES capture events (peAll)
+                    ++ [ g [ peAll ] (assocsSvg ++ topicsSvg ++ viewLimboAssoc mapId model) ]
+                    -- C) border: only the stroke is interactive (peStroke). Optional.
+                    ++ [ rect
+                            [ SA.x (String.fromFloat mapRect.x1)
+                            , SA.y (String.fromFloat mapRect.y1)
+                            , SA.width (String.fromFloat (mapRect.x2 - mapRect.x1))
+                            , SA.height (String.fromFloat (mapRect.y2 - mapRect.y1))
+                            , SA.fill "none"
+                            , SA.stroke "#ddd"
+                            , SA.strokeWidth "1"
+                            , peStroke
+                            ]
+                            []
+                       ]
+                )
+            ]
         ]
 
 
@@ -303,15 +332,18 @@ viewTopicSvg topic props mapPath model =
 
         mainNodes : List (Svg Msg)
         mainNodes =
-            [ -- invisible square hitbox so label/circle are easy to grab
+            [ -- transparent hitbox: the event target
               rect
-                [ SA.x (fromFloat (props.pos.x - rVal))
-                , SA.y (fromFloat (props.pos.y - rVal))
-                , SA.width (fromFloat (rVal * 2))
-                , SA.height (fromFloat (rVal * 2))
-                , SA.fill "transparent"
-                , SA.pointerEvents "all" -- << use Svg.Attributes.pointerEvents
-                ]
+                ([ SA.x (fromFloat (props.pos.x - rVal))
+                 , SA.y (fromFloat (props.pos.y - rVal))
+                 , SA.width (fromFloat (rVal * 2))
+                 , SA.height (fromFloat (rVal * 2))
+                 , SA.fill "transparent"
+                 , SA.pointerEvents "all"
+                 , cursorPointer
+                 ]
+                    ++ svgTopicHandlers topic.id mapPath
+                )
                 []
             , circle
                 [ SA.cx cxStr
@@ -321,6 +353,7 @@ viewTopicSvg topic props mapPath model =
                 , SA.stroke "black"
                 , SA.strokeWidth (fromFloat topicBorderWidth ++ "px")
                 , SA.strokeDasharray dash
+                , SA.pointerEvents "none" -- <- let the hitbox handle it
                 ]
                 []
             , Svg.text_
@@ -332,6 +365,7 @@ viewTopicSvg topic props mapPath model =
                 , SA.fontSize (fromInt contentFontSize ++ "px")
                 , SA.fontWeight topicLabelWeight
                 , SA.fill "black"
+                , SA.pointerEvents "none" -- <- text should not steal events
                 ]
                 [ Svg.text mark ]
             , Svg.title [] [ Svg.text (getTopicLabel topic) ]
@@ -605,6 +639,7 @@ whiteBoxStyle topicId rect mapId model =
     , Attr.style "height" <| fromFloat height ++ "px"
     , Attr.style "border-radius" <| "0 " ++ r ++ " " ++ r ++ " " ++ r
     , Attr.style "overflow" "hidden"
+    , Attr.style "pointer-events" "none" -- pass clicks through to SVG
     ]
         ++ topicBorderStyle topicId mapId model
         ++ selectionStyle topicId mapId model
@@ -634,8 +669,9 @@ labelTopicHtml topic props mapId model =
                 input
                     ([ Attr.id <| "dmx-input-" ++ fromInt topic.id ++ "-" ++ fromInt mapId
                      , Attr.value topic.text
-                     , onInput (Edit << OnTextInput)
-                     , onBlur (Edit EditEnd)
+                     , Attr.style "pointer-events" "auto"
+                     , HE.onInput (Edit << OnTextInput)
+                     , HE.onBlur (Edit EditEnd)
                      , onEnterOrEsc (Edit EditEnd)
                      , stopPropagationOnMousedown NoOp
                      ]
@@ -668,8 +704,9 @@ detailTopic topic props mapPath model =
             if isEdit then
                 textarea
                     ([ Attr.id <| "dmx-input-" ++ fromInt topic.id ++ "-" ++ fromInt mapId
-                     , onInput (Edit << OnTextareaInput)
-                     , onBlur (Edit EditEnd)
+                     , Attr.style "pointer-events" "auto"
+                     , HE.onInput (Edit << OnTextareaInput)
+                     , HE.onBlur (Edit EditEnd)
                      , onEsc (Edit EditEnd)
                      , stopPropagationOnMousedown NoOp
                      ]
@@ -873,8 +910,8 @@ htmlTopicAttr id mapPath =
     , Attr.attribute "data-id" (fromInt id)
     , Attr.attribute "data-path" (fromPath mapPath)
     , Attr.style "cursor" "move"
-    , SE.on "mousedown" (D.map (Mouse << Mouse.DownOnItem topicCls id mapPath) posDecoder)
-    , SE.on "pointerdown" (D.map (Mouse << Mouse.DownOnItem topicCls id mapPath) posDecoder)
+    , HE.on "mousedown" (D.map (Mouse << Mouse.DownOnItem topicCls id mapPath) posDecoder)
+    , HE.on "pointerdown" (D.map (Mouse << Mouse.DownOnItem topicCls id mapPath) posDecoder)
     ]
 
 
@@ -1422,11 +1459,23 @@ posDecoder =
         (D.field "clientY" D.float)
 
 
+svgTopicHandlers : Id -> MapPath -> List (Svg.Attribute Msg)
+svgTopicHandlers id mapPath =
+    [ SE.on "pointerdown" (D.map (Mouse << Mouse.DownOnItem topicCls id mapPath) posDecoder)
+    , SE.on "mousedown" (D.map (Mouse << Mouse.DownOnItem topicCls id mapPath) posDecoder)
+    , SE.on "pointermove" (D.map (Mouse << Mouse.Move) posDecoder)
+    , SE.on "mousemove" (D.map (Mouse << Mouse.Move) posDecoder)
+    , SE.on "pointerup" (D.succeed (Mouse Mouse.Up))
+    , SE.on "mouseup" (D.succeed (Mouse Mouse.Up))
+    ]
+
+
 dragHandle : Id -> MapPath -> Html Msg
 dragHandle id mapPath =
     div
         [ Attr.attribute "data-drag-handle" "1"
         , Attr.attribute "title" "Drag handle"
+        , Attr.style "pointer-events" "auto" -- override
         , Attr.style "position" "absolute"
         , Attr.style "left" "-6px"
         , Attr.style "top" "-6px"

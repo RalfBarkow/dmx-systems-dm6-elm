@@ -1,4 +1,4 @@
-module MouseAPI exposing (mouseHoverHandler, mouseSubs, updateMouse)
+module MouseAPI exposing (mouseHoverHandler, mouseSubs, svgMouseHoverHandler, updateMouse)
 
 import AppModel exposing (Model, Msg(..), UndoModel)
 import Browser.Events as Events
@@ -26,6 +26,8 @@ import Random
 import SearchAPI exposing (closeResultMenu)
 import Storage exposing (storeWith)
 import String exposing (fromInt)
+import Svg as S
+import Svg.Events as SE
 import Task
 import Time exposing (Posix, posixToMillis)
 import Utils
@@ -51,6 +53,13 @@ mouseHoverHandler =
     ]
 
 
+svgMouseHoverHandler : List (S.Attribute Msg)
+svgMouseHoverHandler =
+    [ SE.on "mouseover" (mouseDecoder Mouse.Over)
+    , SE.on "mouseout" (mouseDecoder Mouse.Out)
+    ]
+
+
 
 -- UPDATE
 
@@ -66,7 +75,18 @@ updateMouse msg ({ present } as undoModel) =
                 |> swap undoModel
 
         Mouse.Move pos ->
-            mouseMove present pos |> swap undoModel
+            case present.mouse.dragState of
+                NoDrag ->
+                    -- don't forward Move into mouseMove; avoids the spammy log
+                    ( undoModel, Cmd.none )
+
+                WaitForStartTime _ _ _ _ ->
+                    -- still waiting for the debounce/start timer; ignore Move
+                    ( undoModel, Cmd.none )
+
+                -- For all other drag states, let mouseMove handle it.
+                _ ->
+                    mouseMove present pos |> swap undoModel
 
         Mouse.Up ->
             mouseUp undoModel
