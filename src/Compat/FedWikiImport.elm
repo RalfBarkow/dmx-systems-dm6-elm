@@ -14,7 +14,7 @@ import Json.Encode as E
 import Model exposing (DisplayMode(..), Id, MapItem, MapItems, MapProps(..), Rectangle, TopicProps)
 import ModelAPI exposing (currentMapId, updateMaps)
 import String
-import Utils exposing (info)
+import Utils as U
 
 
 
@@ -185,7 +185,7 @@ importPage value model0 =
                     List.reverse revIds
 
                 _ =
-                    info "fedwiki.import.structured"
+                    U.info "fedwiki.import.structured"
                         { containerId = titleId
                         , storyCount = List.length storyIds
                         }
@@ -218,38 +218,9 @@ setWhiteBoxOnCurrentMap : Id -> AM.Model -> AM.Model
 setWhiteBoxOnCurrentMap tid model =
     let
         _ =
-            info "setWhiteBoxOnCurrentMap" { topicId = tid, currentMapId = currentMapId model }
+            U.info "setWhiteBoxOnCurrentMap" { topicId = tid, currentMapId = currentMapId model }
 
         mid =
             currentMapId model
-
-        maps1 =
-            updateMaps mid
-                (\m ->
-                    { m
-                        | items =
-                            Dict.update tid
-                                (\maybeItem ->
-                                    maybeItem
-                                        |> Maybe.map
-                                            (\item ->
-                                                case item.props of
-                                                    MapTopic p ->
-                                                        { item
-                                                            | props =
-                                                                MapTopic
-                                                                    { p
-                                                                        | displayMode = Container Model.WhiteBox
-                                                                    }
-                                                        }
-
-                                                    _ ->
-                                                        item
-                                            )
-                                )
-                                m.items
-                    }
-                )
-                model.maps
     in
-    { model | maps = maps1 }
+    ModelAPI.setDisplayMode tid mid (Container Model.WhiteBox) model
