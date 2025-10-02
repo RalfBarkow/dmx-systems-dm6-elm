@@ -18,7 +18,6 @@ import Main
 import Mouse.Pretty as MousePretty
 import MouseAPI exposing (mouseSubs)
 import String exposing (fromInt)
-import Utils as U
 
 
 
@@ -63,7 +62,7 @@ subscriptions =
 
 main : Program E.Value UndoModel Msg
 main =
-    Main.ma.in
+    Main.main
 
 
 prettyMsg : AM.Msg -> String

@@ -33,7 +33,7 @@ import Svg exposing (Svg, circle, g, path, rect, svg)
 import Svg.Attributes as SA
 import Svg.Events as SE
 import SvgExtras exposing (cursorPointer, peAll, peNone, peStroke)
-import Utils exposing (..)
+import Utils as U
 
 
 
@@ -196,10 +196,10 @@ mapItems map mapPath model =
                                         )
 
                             _ ->
-                                logError "mapItems" ("problem with item " ++ fromInt id) ( htmlTopics, assocs, topicsSvg )
+                                U.logError "mapItems" ("problem with item " ++ fromInt id) ( htmlTopics, assocs, topicsSvg )
 
                     _ ->
-                        logError "mapItems" ("problem with item " ++ fromInt id) ( htmlTopics, assocs, topicsSvg )
+                        U.logError "mapItems" ("problem with item " ++ fromInt id) ( htmlTopics, assocs, topicsSvg )
             )
             ( [], [], [] )
 
@@ -536,16 +536,6 @@ effectiveDisplayMode topicId incoming model =
 
             else
                 incoming
-
-        _ =
-            info "effectiveDisplayMode"
-                ( topicId
-                , { isFedWiki = isFedWiki
-                  , isLimbo = isLimbo
-                  , incoming = displayModeToString incoming
-                  , result = displayModeToString decided
-                  }
-                )
     in
     decided
 
@@ -672,8 +662,8 @@ labelTopicHtml topic props mapId model =
                      , Attr.style "pointer-events" "auto"
                      , HE.onInput (Edit << OnTextInput)
                      , HE.onBlur (Edit EditEnd)
-                     , onEnterOrEsc (Edit EditEnd)
-                     , stopPropagationOnMousedown NoOp
+                     , U.onEnterOrEsc (Edit EditEnd)
+                     , U.stopPropagationOnMousedown NoOp
                      ]
                         ++ topicInputStyle
                     )
@@ -707,8 +697,8 @@ detailTopic topic props mapPath model =
                      , Attr.style "pointer-events" "auto"
                      , HE.onInput (Edit << OnTextareaInput)
                      , HE.onBlur (Edit EditEnd)
-                     , onEsc (Edit EditEnd)
-                     , stopPropagationOnMousedown NoOp
+                     , U.onEsc (Edit EditEnd)
+                     , U.stopPropagationOnMousedown NoOp
                      ]
                         ++ detailTextStyle topic.id mapId model
                         ++ detailTextEditStyle topic.id mapId model
@@ -720,7 +710,7 @@ detailTopic topic props mapPath model =
                     (detailTextStyle topic.id mapId model
                         ++ detailTextViewStyle
                     )
-                    (multilineHtml topic.text)
+                    (U.multilineHtml topic.text)
     in
     ( detailTopicStyle props
     , [ div
@@ -816,7 +806,7 @@ whiteBoxTopic : TopicInfo -> TopicProps -> MapPath -> Model -> TopicRendering
 whiteBoxTopic topic props mapPath model =
     let
         _ =
-            info "whiteBoxTopic.called" { topicId = topic.id }
+            U.info "whiteBoxTopic.called" { topicId = topic.id }
 
         ( styleLabel, childrenLabel ) =
             labelTopic topic props mapPath model
@@ -960,7 +950,7 @@ assocGeometry assoc mapId model =
             Just geometry
 
         Nothing ->
-            fail "assocGeometry" { assoc = assoc, mapId = mapId } Nothing
+            U.fail "assocGeometry" { assoc = assoc, mapId = mapId } Nothing
 
 
 viewLimboAssoc : MapId -> Model -> List (Svg Msg)
@@ -1003,7 +993,7 @@ absMapPos mapPath posAcc model =
             accumulateMapPos posAcc mapId parentMapId mapIds model
 
         [] ->
-            logError "absMapPos" "mapPath is empty!" (Point 0 0)
+            U.logError "absMapPos" "mapPath is empty!" (Point 0 0)
 
 
 accumulateMapPos : Point -> MapId -> MapId -> MapPath -> Model -> Point

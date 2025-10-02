@@ -6,7 +6,7 @@ import Dict exposing (Dict)
 import Model exposing (..)
 import String exposing (fromInt)
 import UndoList
-import Utils exposing (..)
+import Utils as U
 
 
 
@@ -132,7 +132,7 @@ activeMap model =
             mapId
 
         Nothing ->
-            logError "activeMap" "mapPath is empty!" 0
+            U.logError "activeMap" "mapPath is empty!" 0
 
 
 {-| Returns -1 if mapPath is empty
@@ -207,7 +207,7 @@ getTopicPos topicId mapId maps =
             Just pos
 
         Nothing ->
-            fail "getTopicPos" { topicId = topicId, mapId = mapId } Nothing
+            U.fail "getTopicPos" { topicId = topicId, mapId = mapId } Nothing
 
 
 {-| Logs an error if map does not exist or if topic is not in map
@@ -244,7 +244,7 @@ getTopicSize topicId mapId maps =
             Just size
 
         Nothing ->
-            fail "getTopicSize" { topicId = topicId, mapId = mapId } Nothing
+            U.fail "getTopicSize" { topicId = topicId, mapId = mapId } Nothing
 
 
 {-| Logs an error if map does not exist or if topic is not in map
@@ -264,17 +264,37 @@ getDisplayMode topicId mapId maps =
             Just displayMode
 
         Nothing ->
-            fail "getDisplayMode" { topicId = topicId, mapId = mapId } Nothing
+            U.fail "getDisplayMode" { topicId = topicId, mapId = mapId } Nothing
 
 
-{-| Logs an error if map does not exist or if topic is not in map
+{-| Logs an error if map does not exist or if topic is not in map.
+Now also logs a single line only when the display mode actually changes.
 -}
 setDisplayMode : Id -> MapId -> DisplayMode -> Model -> Model
-setDisplayMode topicId mapId displayMode model =
+setDisplayMode topicId mapId newMode model =
     model
         |> updateTopicProps topicId
             mapId
-            (\props -> { props | displayMode = displayMode })
+            (\props ->
+                let
+                    old =
+                        props.displayMode
+                in
+                if old /= newMode then
+                    let
+                        _ =
+                            U.info "displayMode.change"
+                                { topic = topicId
+                                , map = mapId
+                                , old = U.toString old
+                                , new = U.toString newMode
+                                }
+                    in
+                    { props | displayMode = newMode }
+
+                else
+                    props
+            )
 
 
 getTopicProps : Id -> MapId -> Maps -> Maybe TopicProps
@@ -289,7 +309,7 @@ getTopicProps topicId mapId maps =
                     topicMismatch "getTopicProps" topicId Nothing
 
         Nothing ->
-            fail "getTopicProps" { topicId = topicId, mapId = mapId } Nothing
+            U.fail "getTopicProps" { topicId = topicId, mapId = mapId } Nothing
 
 
 {-| Logs an error if map does not exist or if topic is not in map
@@ -464,7 +484,7 @@ addItemToMap itemId props incomingMapId model0 =
         -- Only log normalization when we actually changed it.
         _ =
             if incomingMapId /= targetMapId then
-                info "ModelAPI.addItemToMap.normalized"
+                U.info "ModelAPI.addItemToMap.normalized"
                     { attemptedMapId = incomingMapId
                     , normalizedTo = targetMapId
                     , existingMapIds = Dict.keys newModel.maps
@@ -478,7 +498,7 @@ addItemToMap itemId props incomingMapId model0 =
 
         -- log the actual add
         _ =
-            info "ModelAPI.addItemToMap"
+            U.info "ModelAPI.addItemToMap"
                 { itemId = itemId
                 , mapId = targetMapId
                 , parentAssocId = parentAssocId
@@ -551,11 +571,11 @@ updateMaps mid f maps =
         Nothing ->
             let
                 _ =
-                    logError "updateMaps.illegal-map-id"
+                    U.logError "updateMaps.illegal-map-id"
                         ("mapId="
                             ++ String.fromInt mid
                             ++ " existing="
-                            ++ toString (Dict.keys maps)
+                            ++ U.toString (Dict.keys maps)
                         )
                         maps
             in
@@ -712,17 +732,17 @@ reset ( model, cmd ) =
 
 itemNotInMap : String -> Id -> Id -> a -> a
 itemNotInMap funcName itemId mapId val =
-    logError funcName ("item " ++ fromInt itemId ++ " not in map " ++ fromInt mapId) val
+    U.logError funcName ("item " ++ fromInt itemId ++ " not in map " ++ fromInt mapId) val
 
 
 topicMismatch : String -> Id -> a -> a
 topicMismatch funcName id val =
-    logError funcName (fromInt id ++ " is not a Topic but an Assoc") val
+    U.logError funcName (fromInt id ++ " is not a Topic but an Assoc") val
 
 
 assocMismatch : String -> Id -> a -> a
 assocMismatch funcName id val =
-    logError funcName (fromInt id ++ " is not an Assoc but a Topic") val
+    U.logError funcName (fromInt id ++ " is not an Assoc but a Topic") val
 
 
 illegalMapId : String -> Id -> a -> a
@@ -737,7 +757,7 @@ illegalItemId funcName id val =
 
 illegalId : String -> String -> Id -> a -> a
 illegalId funcName item id val =
-    logError funcName (fromInt id ++ " is an illegal " ++ item ++ " ID") val
+    U.logError funcName (fromInt id ++ " is an illegal " ++ item ++ " ID") val
 
 
 
