@@ -269,10 +269,10 @@ moveDeps =
     , setTopicPos = setTopicPos
     , select = select
     , autoSize = autoSize
-    , getItem = \tid m -> getMapItemById tid (activeMap m) m.maps
-    , updateItem = updateItemById
-    , worldToLocal = worldToLocalPos
-    , ownerToMapId = \ownerId _ -> ownerId
+    , getItem = \tid m -> getItemAny tid m -- <— cross-map
+    , updateItem = updateItemById -- <— cross-map
+    , worldToLocal = worldToLocalPos -- <— cross-map
+    , ownerToMapId = \ownerId _ -> ownerId -- keep if “mapId == ownerId”
     }
 
 
@@ -281,36 +281,40 @@ getItemFromModel tid m =
     getMapItemById tid (activeMap m) m.maps
 
 
+
+-- update the correct map when promoting target
+
+
 updateItemById : Id -> (MapItem -> MapItem) -> Model -> Model
 updateItemById targetId f model =
-    let
-        amendItems : Dict Id MapItem -> Dict Id MapItem
-        amendItems =
-            Dict.update targetId (Maybe.map f)
+    case findItemInAnyMap targetId model.maps of
+        Nothing ->
+            model
 
-        amendMap : Map -> Map
-        amendMap m =
-            { m | items = amendItems m.items }
+        Just ( mid, _ ) ->
+            let
+                amendItems : Dict Id MapItem -> Dict Id MapItem
+                amendItems =
+                    Dict.update targetId (Maybe.map f)
 
-        activeId : MapId
-        activeId =
-            activeMap model
+                amendMap : Map -> Map
+                amendMap m =
+                    { m | items = amendItems m.items }
 
-        maps2 : Maps
-        maps2 =
-            Dict.update activeId (Maybe.map amendMap) model.maps
-    in
-    { model | maps = maps2 }
+                maps2 : Maps
+                maps2 =
+                    Dict.update mid (Maybe.map amendMap) model.maps
+            in
+            { model | maps = maps2 }
 
 
 worldToLocalPos : Id -> Point -> Model -> Maybe Point
 worldToLocalPos targetId world model =
-    getMapItemById targetId (activeMap model) model.maps
+    getItemAny targetId model
         |> Maybe.andThen
             (\it ->
                 case it.props of
                     MapTopic tp ->
-                        -- naive: world relative to target’s top-left
                         Just
                             { x = world.x - tp.pos.x
                             , y = world.y - tp.pos.y
@@ -319,6 +323,36 @@ worldToLocalPos targetId world model =
                     _ ->
                         Nothing
             )
+
+
+
+-- Model-aware getter used by Feature.Move deps
+
+
+getItemAny : Id -> Model -> Maybe MapItem
+getItemAny tid model =
+    findItemInAnyMap tid model.maps
+        |> Maybe.map Tuple.second
+
+
+
+-- Find (mapId, item) for a topic anywhere in the model
+
+
+findItemInAnyMap : Id -> Maps -> Maybe ( MapId, MapItem )
+findItemInAnyMap tid maps =
+    Dict.foldl
+        (\mid m acc ->
+            case acc of
+                Just _ ->
+                    acc
+
+                Nothing ->
+                    Dict.get tid m.items
+                        |> Maybe.map (\it -> ( mid, it ))
+        )
+        Nothing
+        maps
 
 
 createMapIfNeeded : Id -> Model -> ( Model, Bool )
