@@ -75,10 +75,6 @@ pointDecoder =
         (D.field "clientY" D.float)
 
 
-
---
-
-
 toIntDecoder : String -> D.Decoder Int
 toIntDecoder str =
     case String.toInt str of
@@ -89,21 +85,28 @@ toIntDecoder str =
             D.fail <| "\"" ++ str ++ "\" is not an Int"
 
 
+sequenceDecoders : List (D.Decoder a) -> D.Decoder (List a)
+sequenceDecoders =
+    List.foldr (D.map2 (::)) (D.succeed [])
+
+
 toIntListDecoder : String -> D.Decoder (List Int)
 toIntListDecoder str =
-    D.succeed
-        (str
-            |> String.split ","
-            |> List.map
-                (\mapIdStr ->
-                    case mapIdStr |> String.toInt of
-                        Just mapId ->
-                            mapId
+    let
+        parseOne s =
+            case String.toInt (String.trim s) of
+                Just n ->
+                    D.succeed n
 
-                        Nothing ->
-                            logError "toIntListDecoder" ("\"" ++ mapIdStr ++ "\" is not an Int") -1
-                )
-        )
+                Nothing ->
+                    D.fail <| "\"" ++ s ++ "\" is not an Int"
+    in
+    str
+        |> String.trim
+        |> String.split ","
+        |> List.filter (\s -> s /= "")
+        |> List.map parseOne
+        |> sequenceDecoders
 
 
 

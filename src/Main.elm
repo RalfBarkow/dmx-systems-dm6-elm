@@ -17,6 +17,7 @@ import MapAutoSize exposing (autoSize)
 import MapRenderer exposing (viewMap)
 import Model as M exposing (..)
 import ModelAPI exposing (..)
+import Mouse.Pretty as MousePretty
 import MouseAPI exposing (mouseHoverHandler, mouseSubs, updateMouse)
 import SearchAPI exposing (updateSearch, viewResultMenu)
 import Storage exposing (exportJSON, importJSON, modelDecoder, store, storeWith)
@@ -25,7 +26,7 @@ import Task
 import Toolbar exposing (viewToolbar)
 import Types exposing (Id, MapId, MapItem, Maps, Point)
 import UndoList
-import Utils exposing (..)
+import Utils as U exposing (call, classDecoder, fail, idDecoder, info, logError, onEnterOrEsc, onEsc, pathDecoder, pointDecoder, stopPropagationOnMousedown, toString)
 
 
 
@@ -40,6 +41,10 @@ main =
         , update = update
         , subscriptions = mouseSubs
         }
+
+
+
+-- INIT
 
 
 init : E.Value -> ( UndoModel, Cmd Msg )
@@ -675,3 +680,68 @@ redo undoModel =
     newModel
         |> store
         |> swap newUndoModel
+
+
+prettyMsg : Msg -> String
+prettyMsg msg =
+    case msg of
+        Mouse m ->
+            "Mouse." ++ MousePretty.pretty m
+
+        Search m ->
+            "Search." ++ toString m
+
+        IconMenu m ->
+            "IconMenu." ++ toString m
+
+        Edit m ->
+            "Edit." ++ toString m
+
+        Nav m ->
+            "Nav." ++ toString m
+
+        -- 🔧 Missing branch added here
+        MoveTopicToMap topicId mapId origPos targetId targetPath dropWorld ->
+            let
+                pathStr =
+                    "[" ++ String.join "," (List.map fromInt targetPath) ++ "]"
+            in
+            "MoveTopicToMap T"
+                ++ fromInt topicId
+                ++ " from M"
+                ++ fromInt mapId
+                ++ " orig="
+                ++ toString origPos
+                ++ " → T"
+                ++ fromInt targetId
+                ++ " path="
+                ++ pathStr
+                ++ " drop="
+                ++ toString dropWorld
+
+        AddTopic ->
+            "AddTopic"
+
+        SwitchDisplay mode ->
+            "SwitchDisplay." ++ toString mode
+
+        Hide ->
+            "Hide"
+
+        Delete ->
+            "Delete"
+
+        Undo ->
+            "Undo"
+
+        Redo ->
+            "Redo"
+
+        Import ->
+            "Import"
+
+        Export ->
+            "Export"
+
+        NoOp ->
+            "NoOp"
