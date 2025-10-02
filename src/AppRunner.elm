@@ -13,6 +13,7 @@ import AppModel as AM
 import Browser
 import Compat.FedWiki as CFW
 import Dict
+import FedWiki as FW
 import Html as H
 import IconMenu
 import Json.Decode as D
@@ -266,6 +267,9 @@ update msg undo =
                                         }
                             in
                             ()
+
+                _ =
+                    U.info "fedwiki.synopsis" (FW.synopsisLite rawJson)
             in
             -- Proceed with your existing Compat import
             case D.decodeString CFW.decodePage rawJson of

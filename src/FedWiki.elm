@@ -4,17 +4,13 @@ module FedWiki exposing
     , importValue
     , renderAsMonad
     , summarizeLite
+    , synopsisLite
     )
 
 import AppModel as AM
 import Compat.FedWiki as CFW
 import Dict
 import Json.Decode as D
-
-
-titleDecoder : D.Decoder String
-titleDecoder =
-    D.field "title" D.string
 
 
 decodePage : D.Decoder D.Value
@@ -79,3 +75,36 @@ renderAsMonad raw model =
             importString raw model
     in
     m
+
+
+synopsisLite : String -> String
+synopsisLite raw =
+    case summarizeLite raw of
+        Ok s ->
+            let
+                bucket ( k, v ) =
+                    String.fromInt v
+                        ++ " "
+                        ++ k
+                        ++ (if v == 1 then
+                                ""
+
+                            else
+                                "s"
+                           )
+
+                parts =
+                    s.histogram
+                        |> Dict.toList
+                        |> List.map bucket
+                        |> String.join ", "
+            in
+            s.title
+                ++ " — "
+                ++ String.fromInt s.total
+                ++ " blocks ("
+                ++ parts
+                ++ ")"
+
+        Err _ ->
+            "unknown — 0 blocks"
