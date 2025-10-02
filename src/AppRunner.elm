@@ -1,6 +1,7 @@
 module AppRunner exposing
     ( Msg(..)
     , UndoModel
+    , fromInner
     , init
     , onFedWikiPage
     , subscriptions
@@ -13,13 +14,18 @@ import Browser
 import Compat.FedWiki as CFW
 import Dict
 import Html as H
+import IconMenu
 import Json.Decode as D
 import Json.Encode as E
 import Main
+import Model exposing (EditMsg, NavMsg)
 import ModelAPI exposing (activeMap)
+import Mouse
 import MouseAPI exposing (mouseSubs)
 import Platform.Sub as Sub
-import Utils exposing (info)
+import Search
+import Types exposing (DisplayMode, Id, MapId, MapPath, Point)
+import Utils as U
 
 
 
@@ -76,22 +82,146 @@ type alias UndoModel =
 
 
 
--- Our wrapper messages
+-- EXPLICIT WRAPPER MESSAGE (mirrors AM.Msg) + FedWiki
 
 
 type Msg
-    = FromModel AM.Msg
-    | FedWikiPage String
+    = AddTopic
+    | MoveTopicToMap Id MapId Point Id MapPath Point
+    | SwitchDisplay DisplayMode
+    | Edit EditMsg
+    | Nav NavMsg
+    | Hide
+    | Delete
+    | Undo
+    | Redo
+    | Import
+    | Export
     | NoOp
+      -- components
+    | Mouse Mouse.Msg
+    | Search Search.Msg
+    | IconMenu IconMenu.Msg
+      -- external (kept in AppRunner)
+    | FedWikiPage String
 
 
-init : E.Value -> ( AM.UndoModel, Cmd Msg )
-init flags =
-    let
-        ( undo0, cmd0 ) =
-            Main.init flags
-    in
-    ( undo0, Cmd.map FromModel cmd0 )
+
+-- Map AppRunner.Msg -> AM.Msg (when delegating to Main)
+
+
+toInner : Msg -> Maybe AM.Msg
+toInner msg =
+    case msg of
+        AddTopic ->
+            Just AM.AddTopic
+
+        MoveTopicToMap a b c d e f ->
+            Just (AM.MoveTopicToMap a b c d e f)
+
+        SwitchDisplay d ->
+            Just (AM.SwitchDisplay d)
+
+        Edit m ->
+            Just (AM.Edit m)
+
+        Nav m ->
+            Just (AM.Nav m)
+
+        Hide ->
+            Just AM.Hide
+
+        Delete ->
+            Just AM.Delete
+
+        Undo ->
+            Just AM.Undo
+
+        Redo ->
+            Just AM.Redo
+
+        Import ->
+            Just AM.Import
+
+        Export ->
+            Just AM.Export
+
+        NoOp ->
+            Just AM.NoOp
+
+        Mouse m ->
+            Just (AM.Mouse m)
+
+        Search m ->
+            Just (AM.Search m)
+
+        IconMenu m ->
+            Just (AM.IconMenu m)
+
+        FedWikiPage _ ->
+            Nothing
+
+
+
+-- Map AM.Msg -> AppRunner.Msg (for Cmd/view/subs mapping)
+
+
+fromInner : AM.Msg -> Msg
+fromInner am =
+    case am of
+        AM.AddTopic ->
+            AddTopic
+
+        AM.MoveTopicToMap a b c d e f ->
+            MoveTopicToMap a b c d e f
+
+        AM.SwitchDisplay d ->
+            SwitchDisplay d
+
+        AM.Edit m ->
+            Edit m
+
+        AM.Nav m ->
+            Nav m
+
+        AM.Hide ->
+            Hide
+
+        AM.Delete ->
+            Delete
+
+        AM.Undo ->
+            Undo
+
+        AM.Redo ->
+            Redo
+
+        AM.Import ->
+            Import
+
+        AM.Export ->
+            Export
+
+        AM.NoOp ->
+            NoOp
+
+        AM.Mouse m ->
+            Mouse m
+
+        AM.Search m ->
+            Search m
+
+        AM.IconMenu m ->
+            IconMenu m
+
+
+
+-- Init: map Cmd AM.Msg -> Cmd AppRunner.Msg
+
+
+init : E.Value -> ( UndoModel, Cmd Msg )
+init =
+    Main.init >> Tuple.mapSecond (Cmd.map fromInner)
 
 
 
@@ -101,7 +231,85 @@ init flags =
 update : Msg -> AM.UndoModel -> ( AM.UndoModel, Cmd Msg )
 update msg undo =
     case msg of
-        FromModel inner ->
+        FedWikiPage rawJson ->
+            let
+                -- Peek the payload BEFORE Compat import
+                _ =
+                    case D.decodeString fwPageLiteDecoder rawJson of
+                        Ok lite ->
+                            let
+                                total =
+                                    List.length lite.story
+
+                                hist =
+                                    typeHistogram lite.story
+
+                                sample =
+                                    firstN 6 lite.story
+
+                                _ =
+                                    U.info "fedwiki.story.stats"
+                                        { title = lite.title
+                                        , total = total
+                                        , histogram = hist
+                                        , sample = List.map (\s -> { id = s.id, typ = s.typ }) sample
+                                        }
+                            in
+                            ()
+
+                        Err err ->
+                            let
+                                _ =
+                                    U.info "fedwiki.story.decode.err"
+                                        { error = Debug.toString err
+                                        , rawLen = String.length rawJson
+                                        }
+                            in
+                            ()
+            in
+            -- Proceed with your existing Compat import
+            case D.decodeString CFW.decodePage rawJson of
+                Ok val ->
+                    let
+                        ( model1, _ ) =
+                            CFW.pageToModel val undo.present
+
+                        _ =
+                            U.info "fedwiki.decode.ok"
+                                { rawLen = String.length rawJson }
+
+                        _ =
+                            U.info "fedwiki.import"
+                                { itemsBefore = Dict.size undo.present.items
+                                , itemsAfter = Dict.size model1.items
+                                , itemsCreated = Dict.size model1.items - Dict.size undo.present.items
+                                , mapsBefore = Dict.size undo.present.maps
+                                , mapsAfter = Dict.size model1.maps
+                                , mapsDelta = Dict.size model1.maps - Dict.size undo.present.maps
+                                }
+                    in
+                    ( { undo | present = { model1 | fedWikiRaw = rawJson } }
+                    , Cmd.none
+                    )
+
+                Err err ->
+                    let
+                        _ =
+                            U.info "fedwiki.decode.err"
+                                { error = Debug.toString err
+                                , rawLen = String.length rawJson
+                                }
+                    in
+                    ( undo, Cmd.none )
+
+        _ ->
+            forward msg undo
+
+
+forward : Msg -> UndoModel -> ( UndoModel, Cmd Msg )
+forward msg undo =
+    case toInner msg of
+        Just inner ->
             let
                 beforeItems =
                     Dict.size undo.present.items
@@ -125,7 +333,7 @@ update msg undo =
                     activeMap undo1.present
 
                 _ =
-                    info "app.update.forward"
+                    U.info "app.update.forward"
                         { itemsBefore = beforeItems
                         , itemsAfter = afterItems
                         , itemsDelta = afterItems - beforeItems
@@ -136,90 +344,15 @@ update msg undo =
                         , activeAfter = afterActive
                         }
             in
-            ( undo1, Cmd.map FromModel cmd1 )
+            ( undo1, Cmd.map fromInner cmd1 )
 
-        FedWikiPage rawJson ->
-            let
-                -- Peek the payload BEFORE Compat import
-                _ =
-                    case D.decodeString fwPageLiteDecoder rawJson of
-                        Ok lite ->
-                            let
-                                total =
-                                    List.length lite.story
-
-                                hist =
-                                    typeHistogram lite.story
-
-                                sample =
-                                    firstN 6 lite.story
-
-                                _ =
-                                    info "fedwiki.story.stats"
-                                        { title = lite.title
-                                        , total = total
-                                        , histogram = hist
-                                        , sample = List.map (\s -> { id = s.id, typ = s.typ }) sample
-                                        }
-                            in
-                            ()
-
-                        Err err ->
-                            let
-                                _ =
-                                    info "fedwiki.story.decode.err"
-                                        { error = Debug.toString err
-                                        , rawLen = String.length rawJson
-                                        }
-                            in
-                            ()
-            in
-            -- Proceed with your existing Compat import
-            case D.decodeString CFW.decodePage rawJson of
-                Ok val ->
-                    let
-                        ( model1, _ ) =
-                            CFW.pageToModel val undo.present
-
-                        _ =
-                            info "fedwiki.decode.ok"
-                                { rawLen = String.length rawJson }
-
-                        _ =
-                            info "fedwiki.import"
-                                { itemsBefore = Dict.size undo.present.items
-                                , itemsAfter = Dict.size model1.items
-                                , itemsCreated = Dict.size model1.items - Dict.size undo.present.items
-                                , mapsBefore = Dict.size undo.present.maps
-                                , mapsAfter = Dict.size model1.maps
-                                , mapsDelta = Dict.size model1.maps - Dict.size undo.present.maps
-                                }
-                    in
-                    ( { undo | present = { model1 | fedWikiRaw = rawJson } }
-                    , Cmd.none
-                    )
-
-                Err err ->
-                    let
-                        _ =
-                            info "fedwiki.decode.err"
-                                { error = Debug.toString err
-                                , rawLen = String.length rawJson
-                                }
-                    in
-                    ( undo, Cmd.none )
-
-        NoOp ->
-            let
-                _ =
-                    info "noop" {}
-            in
+        Nothing ->
             ( undo, Cmd.none )
 
 
 subscriptions : AM.UndoModel -> Sub.Sub Msg
 subscriptions undo =
-    Sub.map FromModel (mouseSubs undo)
+    Sub.map fromInner (mouseSubs undo)
 
 
 
@@ -235,7 +368,7 @@ view undo =
         -- Browser.Document Main.Msg
     in
     { title = doc.title
-    , body = List.map (H.map FromModel) doc.body
+    , body = List.map (H.map fromInner) doc.body
     }
 
 
@@ -259,7 +392,7 @@ onFedWikiPage raw undoModel =
                     Dict.size model1.items
 
                 _ =
-                    info "fedwiki.import"
+                    U.info "fedwiki.import"
                         { before = before
                         , after = after
                         , created = after - before

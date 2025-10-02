@@ -26,7 +26,7 @@ import Task
 import Toolbar exposing (viewToolbar)
 import Types exposing (Id, MapId, MapItem, Maps, Point)
 import UndoList
-import Utils as U exposing (call, classDecoder, fail, idDecoder, info, logError, onEnterOrEsc, onEsc, pathDecoder, pointDecoder, stopPropagationOnMousedown, toString)
+import Utils as U
 
 
 
@@ -58,7 +58,7 @@ initModel flags =
         Ok True ->
             let
                 _ =
-                    info "init" "localStorage: empty"
+                    U.info "init" "localStorage: empty"
             in
             AppModel.default |> ensureCurrentMap
 
@@ -67,15 +67,15 @@ initModel flags =
                 Ok model ->
                     let
                         _ =
-                            info "init"
-                                ("localStorage: " ++ (model |> toString |> String.length |> fromInt) ++ " bytes")
+                            U.info "init"
+                                ("localStorage: " ++ (model |> U.toString |> String.length |> fromInt) ++ " bytes")
                     in
                     ensureCurrentMap model
 
                 Err e ->
                     let
                         _ =
-                            logError "init" "localStorage" e
+                            U.logError "init" "localStorage" e
                     in
                     AppModel.default |> ensureCurrentMap
 
@@ -189,7 +189,7 @@ update msg ({ present } as undoModel) =
                     msg
 
                 _ ->
-                    info "update" msg
+                    U.info "update" msg
     in
     case msg of
         AddTopic ->
@@ -490,7 +490,7 @@ onTextInput text model =
                 model
 
         NoEdit ->
-            logError "onTextInput" "called when editState is NoEdit" model
+            U.logError "onTextInput" "called when editState is NoEdit" model
 
 
 onTextareaInput : String -> Model -> ( Model, Cmd Msg )
@@ -503,7 +503,7 @@ onTextareaInput text model =
                 |> measureText text topicId mapId
 
         NoEdit ->
-            logError "onTextareaInput" "called when editState is NoEdit" ( model, Cmd.none )
+            U.logError "onTextareaInput" "called when editState is NoEdit" ( model, Cmd.none )
 
 
 measureText : String -> Id -> MapId -> Model -> ( Model, Cmd Msg )
@@ -521,7 +521,7 @@ measureText text topicId mapId model =
                             )
 
                     Err err ->
-                        logError "measureText" (toString err) NoOp
+                        U.logError "measureText" (U.toString err) NoOp
             )
     )
 
@@ -541,7 +541,7 @@ focus model =
                     "dmx-input-" ++ fromInt id ++ "-" ++ fromInt mapId
 
                 NoEdit ->
-                    logError "focus" "called when editState is NoEdit" ""
+                    U.logError "focus" "called when editState is NoEdit" ""
     in
     Dom.focus nodeId
         |> Task.attempt
@@ -551,7 +551,7 @@ focus model =
                         NoOp
 
                     Err e ->
-                        logError "focus" (toString e) NoOp
+                        U.logError "focus" (U.toString e) NoOp
             )
 
 
@@ -595,7 +595,7 @@ back model =
                     )
 
                 _ ->
-                    logError "back" "model.mapPath has a problem" ( 0, [ 0 ], [] )
+                    U.logError "back" "model.mapPath has a problem" ( 0, [ 0 ], [] )
     in
     { model
         | mapPath = mapPath
@@ -689,16 +689,16 @@ prettyMsg msg =
             "Mouse." ++ MousePretty.pretty m
 
         Search m ->
-            "Search." ++ toString m
+            "Search." ++ U.toString m
 
         IconMenu m ->
-            "IconMenu." ++ toString m
+            "IconMenu." ++ U.toString m
 
         Edit m ->
-            "Edit." ++ toString m
+            "Edit." ++ U.toString m
 
         Nav m ->
-            "Nav." ++ toString m
+            "Nav." ++ U.toString m
 
         -- 🔧 Missing branch added here
         MoveTopicToMap topicId mapId origPos targetId targetPath dropWorld ->
@@ -711,19 +711,19 @@ prettyMsg msg =
                 ++ " from M"
                 ++ fromInt mapId
                 ++ " orig="
-                ++ toString origPos
+                ++ U.toString origPos
                 ++ " → T"
                 ++ fromInt targetId
                 ++ " path="
                 ++ pathStr
                 ++ " drop="
-                ++ toString dropWorld
+                ++ U.toString dropWorld
 
         AddTopic ->
             "AddTopic"
 
         SwitchDisplay mode ->
-            "SwitchDisplay." ++ toString mode
+            "SwitchDisplay." ++ U.toString mode
 
         Hide ->
             "Hide"

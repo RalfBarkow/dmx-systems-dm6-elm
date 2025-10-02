@@ -1,7 +1,7 @@
 port module AppEmbed exposing (main)
 
 import AppModel as AM
-import AppRunner as App exposing (Msg(..))
+import AppRunner as App exposing (Msg(..), fromInner)
 import Browser
 import Html as H
 import Json.Encode as E
@@ -41,7 +41,7 @@ view undo =
                     activeMap model
     in
     -- Empty mapPath => fullscreen; you see inner story items as LabelOnly circles
-    H.map App.FromModel (viewMap currentMapId [] model)
+    H.map App.fromInner (viewMap currentMapId [] model)
 
 
 main : Program E.Value App.UndoModel App.Msg
