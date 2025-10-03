@@ -24,7 +24,8 @@ fi
 [ -f "$log_prod_src" ] || { echo "ERROR: $log_prod_src missing." >&2; exit 1; }
 [ -f "$log_dev_src" ]  || { echo "ERROR: $log_dev_src missing."  >&2; exit 1; }
 [ -f "$template" ]     || { echo "ERROR: $template missing."     >&2; exit 1; }
-command -v uglifyjs >/dev/null 2>&1 || { echo "ERROR: uglify-js not found (npm i -D uglify-js)." >&2; exit 1; }
+command -v pnpm >/dev/null 2>&1 || { echo "ERROR: pnpm not found. Use the Nix devshell or run 'corepack enable'."; exit 1; }
+pnpm exec uglifyjs --version >/dev/null 2>&1 || { echo "ERROR: uglify-js not found in devDependencies. Run: pnpm add -D uglify-js"; exit 1; }
 
 # --- cleanup: restore tracked file via git; fallback to Dev copy ------------
 cleanup() {
@@ -80,7 +81,7 @@ EOF
 # --- build & minify -----------------------------------------------------------
 elm make src/AppMain.elm --optimize --output="$js"
 
-uglifyjs "$js" \
+pnpm exec uglifyjs "$js" \
   --compress "pure_funcs=[F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9],pure_getters,keep_fargs=false,unsafe_comps,unsafe" \
   | uglifyjs --mangle --output "$min"
 

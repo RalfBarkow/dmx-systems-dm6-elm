@@ -16,8 +16,7 @@
             (with pkgs; [
               # Node LTS (includes npm). Use nodejs_22 on newer channels if you prefer.
               nodejs_20
-
-              # editors/tools
+              pnpm
               nixfmt-rfc-style
               git curl cacert gnutar xz
             ]) ++ (with pkgs.elmPackages; [
@@ -29,11 +28,7 @@
             ]);
 
           shellHook = ''
-            echo "🐢 Node: $(node -v)  npm: $(npm -v)"
-            # Optional: enable Corepack so yarn/pnpm shims are available
-            if command -v corepack >/dev/null 2>&1; then
-              corepack enable >/dev/null 2>&1 || true
-            fi
+            echo "🐢 Node: $(node -v)  npm: $(npm -v)  pnpm: $(pnpm -v)"
           '';
         };
       });

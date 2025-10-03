@@ -1,6 +1,7 @@
 {
   "name": "dm6-elm",
   "version": "0.2.0-snapshot",
+  "packageManager": "pnpm@9.7.0",
   "description": "Elm implementation of DM6 system",
   "main": "public/elm.js",
   "repository": {
@@ -20,10 +21,10 @@
   },
   "homepage": "https://github.com/dmx-systems/dm6-elm#readme",
   "scripts": {
-    "dev": "npx elm-live src/Main.elm --dir=public --open --pushstate --port=8000 --host=localhost -- --debug --output=public/main.js",
+    "dev": "elm-live src/Main.elm --dir=public --open --pushstate --port=8000 --host=localhost -- --debug --output=public/main.js",
     "build": "sh build-prod.sh",
-    "format": "npx elm-format --yes src tests review",
-    "format:check": "npx elm-format --validate src tests review",
+    "format": "elm-format --yes src tests review",
+    "format:check": "elm-format --validate src tests review",
     "test": "elm-test",
     "test:master": "elm-test tests/Tests/Master.elm",
     "test:main":   "elm-test tests/Tests/Main.elm",
