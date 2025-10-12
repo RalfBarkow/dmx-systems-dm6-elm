@@ -25,6 +25,7 @@ import String exposing (fromFloat, fromInt)
 import Task
 import Toolbar exposing (viewToolbar)
 import Types exposing (Id, MapId, MapItem, Maps, Point)
+import UI.Icon
 import UndoList
 import Utils as U
 
@@ -136,8 +137,9 @@ view ({ present } as undoModel) =
             (mouseHoverHandler
                 ++ appStyle
             )
-            ([ viewToolbar undoModel
-             , viewMap (activeMap present) [] present -- mapPath = []
+            ([ UI.Icon.sprite "" -- ← Add sprite here (empty prefix for now)
+             , viewToolbar undoModel
+             , viewMap (activeMap present) [] present
              ]
                 ++ viewResultMenu present
                 ++ viewIconMenu present

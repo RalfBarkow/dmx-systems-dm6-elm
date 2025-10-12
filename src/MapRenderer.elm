@@ -613,11 +613,17 @@ topicStyleWithMode tid mode model =
 whiteBoxStyle : Id -> Rectangle -> MapId -> Model -> List (Attribute Msg)
 whiteBoxStyle topicId rect mapId model =
     let
+        minW =
+            182
+
+        minH =
+            54
+
         width =
-            rect.x2 - rect.x1
+            max minW (rect.x2 - rect.x1)
 
         height =
-            rect.y2 - rect.y1
+            max minH (rect.y2 - rect.y1)
 
         r =
             fromInt whiteBoxRadius ++ "px"
@@ -1250,7 +1256,6 @@ svgStyle =
 
 
 
--- One possible line func
 -- One possible line func
 
 
