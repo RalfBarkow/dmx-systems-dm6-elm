@@ -11,3 +11,9 @@ review/
 build
 *.sublime-project
 *.sublime-workspace
+
+# local scratch / generated artifacts
+Patch.patch
+dm6-elm-repomix-output.md
+repomix.config
+repomix-output.md
