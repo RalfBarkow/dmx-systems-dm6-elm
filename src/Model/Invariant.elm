@@ -1,18 +1,18 @@
 module Model.Invariant exposing (hasSelfContainment, offendingSelfContainers)
 
 import Dict exposing (Dict)
-import Model exposing (Map, MapId)
+import Model exposing (Box, BoxId)
 
 
 {-| Return all map ids that list themselves among their items.
 -}
-offendingSelfContainers : Dict MapId Map -> List MapId
-offendingSelfContainers maps =
-    maps
+offendingSelfContainers : Dict BoxId Box -> List BoxId
+offendingSelfContainers boxes =
+    boxes
         |> Dict.foldl
-            (\mapId m acc ->
-                if Dict.member mapId m.items then
-                    mapId :: acc
+            (\boxId box acc ->
+                if Dict.member boxId box.items then
+                    boxId :: acc
 
                 else
                     acc
@@ -23,6 +23,6 @@ offendingSelfContainers maps =
 
 {-| Convenience boolean.
 -}
-hasSelfContainment : Dict MapId Map -> Bool
-hasSelfContainment maps =
-    not (List.isEmpty (offendingSelfContainers maps))
+hasSelfContainment : Dict BoxId Box -> Bool
+hasSelfContainment boxes =
+    not (List.isEmpty (offendingSelfContainers boxes))

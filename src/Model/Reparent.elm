@@ -13,7 +13,7 @@ import Model exposing (..)
       wiring it up with our local `parentsOf` lookup.
 
 -}
-canReparent : Id -> Maybe MapId -> AM.Model -> Result String ()
+canReparent : Id -> Maybe BoxId -> AM.Model -> Result String ()
 canReparent child maybeNewParent model =
     DR.canReparent child maybeNewParent (parentsOf model)
 
@@ -30,7 +30,7 @@ canReparent child maybeNewParent model =
         "dmx.parent" (player2 == parent map id)
 
 -}
-parentsOf : AM.Model -> Id -> List MapId
+parentsOf : AM.Model -> Id -> List BoxId
 parentsOf model childId =
     model.items
         |> Dict.values

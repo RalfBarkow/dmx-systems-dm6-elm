@@ -1,0 +1,54 @@
+diff --git a/repomix.config.json b/repomix.config.json
+new file mode 100644
+index 0000000..8aef000
+--- /dev/null
++++ b/repomix.config.json
+@@ -0,0 +1,48 @@
++{
++  "$schema": "https://repomix.com/schemas/latest/schema.json",
++
++  "input": {
++    "maxFileSize": 1048576
++  },
++
++  "output": {
++    "filePath": "dm6-elm-repomix-output.md",
++    "style": "markdown",
++    "fileSummary": true,
++    "directoryStructure": true,
++    "files": true,
++    "git": {
++      "sortByChanges": true,
++      "sortByChangesMaxCommits": 100
++    }
++  },
++
++  "include": [
++    "src/**/*",
++    "tests/**/*",
++    "scripts/**/*",
++    "examples/**/*",
++    "docs/**/*",
++    "public/**/*",
++    "README.md",
++    "elm.json",
++    "build-dev.sh",
++    "build-prod.sh",
++    "index.html"
++  ],
++
++  "ignore": {
++    "useGitignore": true,
++    "useDotIgnore": true,
++    "useDefaultPatterns": true,
++    "customPatterns": [
++      "**/elm-stuff/**",
++      "**/node_modules/**",
++      "**/dist/**",
++      "**/build/**",
++      "**/coverage/**",
++      "**/*.log",
++      "**/*.lock"
++    ]
++  }
++}
