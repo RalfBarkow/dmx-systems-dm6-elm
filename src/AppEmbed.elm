@@ -1,14 +1,15 @@
 port module AppEmbed exposing (main)
 
-import AppModel as AM
-import AppRunner as App exposing (Msg(..), fromInner)
 import Browser
+import Feature.MouseAPI as MouseAPI
+import Feature.TextAPI as TextAPI
 import Html as H
+import Json.Decode as D
 import Json.Encode as E
-import MapRenderer exposing (viewMap)
-import Model exposing (..)
-import ModelAPI exposing (activeMap)
-import Platform.Sub as Sub
+import Map
+import Model exposing (Model, Msg(..))
+import Main
+import Undo exposing (UndoModel)
 
 
 
@@ -24,36 +25,74 @@ port pageJson : (String -> msg) -> Sub msg
 -- not the outer container topic.
 
 
-view : App.UndoModel -> H.Html App.Msg
+type alias Flags =
+    { slug : String
+    , stored : String
+    }
+
+
+flagsDecoder : D.Decoder Flags
+flagsDecoder =
+    D.map2 Flags
+        (D.field "slug" D.string |> D.maybe |> D.map (Maybe.withDefault "empty"))
+        (D.field "stored" D.string |> D.maybe |> D.map (Maybe.withDefault "{}"))
+
+
+init : E.Value -> ( UndoModel, Cmd Msg )
+init rawFlags =
+    let
+        flags =
+            case D.decodeValue flagsDecoder rawFlags of
+                Ok decoded ->
+                    decoded
+
+                Err _ ->
+                    { slug = "empty", stored = "{}" }
+
+        model =
+            case D.decodeString D.value flags.stored of
+                Ok value ->
+                    case D.decodeValue Model.decoder value of
+                        Ok decodedModel ->
+                            decodedModel
+
+                        Err _ ->
+                            Model.init
+
+                Err _ ->
+                    Model.init
+    in
+    ( model, Cmd.none ) |> Undo.reset
+
+
+view : UndoModel -> H.Html Msg
 view undo =
     let
-        model : AM.Model
+        model : Model
         model =
             undo.present
 
-        currentMapId : Int
-        currentMapId =
-            case model.mapPath of
-                m :: _ ->
-                    m
-
-                [] ->
-                    activeMap model
+        currentBoxId =
+            model.boxId
     in
     -- Empty mapPath => fullscreen; you see inner story items as LabelOnly circles
-    H.map App.fromInner (viewMap currentMapId [] model)
+    Map.view currentBoxId [] model
 
 
-main : Program E.Value App.UndoModel App.Msg
+subscriptions : UndoModel -> Sub Msg
+subscriptions undo =
+    Sub.batch
+        [ MouseAPI.sub undo
+        , TextAPI.sub
+        , pageJson (\_ -> NoOp)
+        ]
+
+
+main : Program E.Value UndoModel Msg
 main =
     Browser.element
-        { init = App.init
-        , update = App.update
-        , subscriptions =
-            \undo ->
-                Sub.batch
-                    [ App.subscriptions undo
-                    , pageJson App.FedWikiPage
-                    ]
+        { init = init
+        , update = Main.update
+        , subscriptions = subscriptions
         , view = view
         }
