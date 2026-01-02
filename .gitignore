@@ -1,8 +1,19 @@
 dm6-elm.html
 main.js
 main.min.js
+src/Logger.elm
+.vite/
+dist/
 elm-stuff/
+node_modules/
 review/
 .DS_Store
 build
-/node_modules
+*.sublime-project
+*.sublime-workspace
+
+# local scratch / generated artifacts
+Patch.patch
+dm6-elm-repomix-output.md
+repomix.config
+repomix-output.md
